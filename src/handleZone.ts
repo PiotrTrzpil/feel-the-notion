@@ -36,15 +36,15 @@ export interface ZoneMetrics {
 export const HANDLE_ROW_WIDTH = 68;
 
 /**
- * Gutter width between the content and a left-side handle.
+ * Gap between a left-side handle row's right edge and the text.
  *
- * Must clear HANDLE_ROW_WIDTH, because a left-side handle is anchored at its
- * own left edge and grows rightward, toward the text. At the old value of 52,
- * tuned when the row was two buttons wide, the third button pushed the grip
- * over the first stretch of the hovered line and it swallowed clicks meant for
- * the caret. The remainder is breathing room between the grip and the text.
+ * A left-side row is anchored at its own RIGHT edge (the handle shifts itself
+ * left by its own width) and grows leftward, away from the text. So the grip
+ * sits this close to the text however many buttons are shown, and a button
+ * reappearing never pushes the grip over the line, where it would swallow
+ * clicks meant for the caret.
  */
-export const HANDLE_LEFT_GAP = 76;
+export const HANDLE_LEFT_GAP = 6;
 
 /** Gap between the content's far edge and a right-side handle. */
 export const HANDLE_RIGHT_GAP = 12;
@@ -52,7 +52,7 @@ export const HANDLE_RIGHT_GAP = 12;
 /**
  * How far past the editor's edge the pointer may stray on the handle's side.
  *
- * It has to clear HANDLE_LEFT_GAP plus the handle's own width, with enough
+ * It has to clear HANDLE_LEFT_GAP plus the handle row's width, with enough
  * left over that a diagonal move from the text to the button never crosses
  * out of the zone and hides the thing being reached for.
  */
@@ -127,7 +127,8 @@ export function lineOffsetInScroller(anchor: LineAnchor): number {
 }
 
 /**
- * The full-width handle row's left position, in the scroller's coordinate space.
+ * Where the handle row is anchored, in the scroller's coordinate space: its
+ * right edge for a left-side handle, its left edge for a right-side one.
  * For left handles, use the rendered line edge when available: themes may
  * center .cm-line independently of .cm-content. The content edge remains the
  * fallback for widgets that have no ordinary line element.

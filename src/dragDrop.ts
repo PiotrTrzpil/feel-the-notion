@@ -19,6 +19,15 @@ import { setDropParent } from "./dropParentTint";
 import { foldHidingLineEnd } from "./blockFold";
 import { FenceSpan, findFenceSpans } from "./codeFence";
 import { t } from "./locale/helpers";
+import { editorInfoField, TFile } from "obsidian";
+import { moveBlockToNote } from "./noteMove";
+import { folderNote } from "./pageIcons";
+
+/** A note in the file explorer the pointer is over, as a drop target. */
+interface NoteTarget {
+    el: HTMLElement;
+    file: TFile;
+}
 
 /**
  * Most rendered lines the drag preview clones. A long block's preview is its
@@ -95,6 +104,12 @@ export class DragManager {
      */
     private lineLeft = 0;
     private lineLeftFor: number | null = null;
+    /**
+     * The file explorer note under the pointer. The drag runs on mouse events,
+     * not HTML5 drag and drop, so the explorer never sees it: the drop target
+     * is found by hit-testing the pointer instead.
+     */
+    private noteTarget: NoteTarget | null = null;
     /** The tinted parent span as "first:last", or null; dispatch only on change. */
     private parentKey: string | null = null;
     private ownerDocument: Document;
@@ -255,13 +270,18 @@ export class DragManager {
 
         // Identity check: an edit from anywhere else mid-drag makes the
         // captured offsets point at different text.
-        if (
-            this.startBlock !== null &&
-            this.currentTargetLine !== null &&
-            this.view.state.doc === this.startDoc
-        ) {
-            this.moveBlock(this.startBlock, this.currentTargetLine);
+        const unchanged = this.startBlock !== null && this.view.state.doc === this.startDoc;
+        if (unchanged && this.noteTarget) {
+            const sourceFile = this.view.state.field(editorInfoField).file;
+            if (sourceFile) {
+                void moveBlockToNote(
+                    this.plugin.app, this.view, this.startBlock!, this.view.state.doc, sourceFile, this.noteTarget.file
+                );
+            }
+        } else if (unchanged && this.currentTargetLine !== null) {
+            this.moveBlock(this.startBlock!, this.currentTargetLine);
         }
+        this.setNoteTarget(null);
 
         this.isDragging = false;
         this.startBlock = null;
@@ -328,6 +348,18 @@ export class DragManager {
         if (!this.isDragging || !this.startBlock) return;
         const source = this.startBlock;
         const doc = this.view.state.doc;
+
+        // Over a note in the file explorer the drop goes to that note, so
+        // there is no line or indent to show in this one.
+        const note = this.noteAt(mouseX, mouseY);
+        this.setNoteTarget(note);
+        if (note) {
+            this.currentTargetLine = null;
+            this.updateGhostPosition(mouseX, mouseY);
+            this.indicatorEl?.removeClass("is-visible");
+            this.setDropParent(null);
+            return;
+        }
 
         // ---- READS --------------------------------------------------------
         // The height map answers "which line is at this y" from CodeMirror's
@@ -429,6 +461,38 @@ export class DragManager {
         }
 
         this.setDropParent(parent);
+    }
+
+    /**
+     * The markdown note in the file explorer at this point, other than the
+     * one being dragged from. A folder with a folder note stands for that
+     * note; other folders and non-markdown files are no target.
+     */
+    private noteAt(x: number, y: number): NoteTarget | null {
+        const hit = this.ownerDocument.elementFromPoint(x, y);
+        const el = hit?.closest<HTMLElement>(
+            '.workspace-leaf-content[data-type="file-explorer"] :is(.nav-file-title, .nav-folder-title)[data-path]'
+        );
+        if (!el) return null;
+        if (this.noteTarget?.el === el) return this.noteTarget;
+
+        const path = el.dataset.path ?? "";
+        const isFolder = el.hasClass("nav-folder-title");
+        if (isFolder && !this.plugin.settings.folderNotes) return null;
+        const file = isFolder
+            ? folderNote(this.plugin.app, path)
+            : this.plugin.app.vault.getAbstractFileByPath(path);
+        const source = this.view.state.field(editorInfoField).file;
+        if (!(file instanceof TFile) || file.extension !== "md" || file === source) return null;
+        return { el, file };
+    }
+
+    /** Highlights the hovered note; the class goes with the drag. */
+    private setNoteTarget(target: NoteTarget | null) {
+        if (this.noteTarget?.el === target?.el) return;
+        this.noteTarget?.el.removeClass("is-block-drop-target");
+        target?.el.addClass("is-block-drop-target");
+        this.noteTarget = target;
     }
 
     /** Tints the would-be parent; a transaction only when it changes. */

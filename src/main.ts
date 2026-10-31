@@ -2,6 +2,7 @@ import { Editor, Plugin } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { BlockPluginSettings, DEFAULT_SETTINGS, BlockPluginSettingTab } from './settings';
 import { blockHandlesExtension } from './blockHandles';
+import { handleLineField } from './handleGutter';
 import { hideSyntaxExtension } from './hideSyntax';
 import { blockSelectionExtension } from './blockSelection';
 import { blockKeymapExtension } from './blockKeymap';
@@ -13,9 +14,26 @@ import { t } from './locale/helpers';
 import { bulletDepthExtension, resolveBulletMarkers } from './bulletDepth';
 import { RELEASE_NOTES, shouldShowWhatsNew } from './whatsNew';
 import { WhatsNewModal } from './whatsNewModal';
+import { ExplorerDecor } from './explorerDecor';
+import { FolderNotes } from './folderNoteView';
+import { PageHeaders } from './pageHeader';
+import { importIconizeIcons } from './iconizeImport';
+import { LinkIcons } from './linkIcons';
+import { Breadcrumbs } from './breadcrumbs';
+import { ExplorerAdd } from './explorerAdd';
+import { registerPageOptions } from './pageOptions';
+import { registerPageSwitcher } from './pageSwitcher';
+import { registerSubpages } from './subpages';
+import { pickTemplate } from './templates';
+import { registerMentionSuggest } from './mentionSuggest';
+import { registerLinkPaste } from './linkPaste';
 
 export default class NotionBlock extends Plugin {
     settings: BlockPluginSettings;
+    private explorerDecor: ExplorerDecor | null = null;
+    private pageHeaders: PageHeaders | null = null;
+    private linkIcons: LinkIcons | null = null;
+    private breadcrumbs: Breadcrumbs | null = null;
 
     async onload() {
         const hadSavedData = await this.loadSettings();
@@ -30,8 +48,39 @@ export default class NotionBlock extends Plugin {
             blockFoldExtension(),
             bulletDepthExtension(() => this.bulletMarkers()),
             dropParentTintField,
+            handleLineField,
         ]);
         this.syncBulletClass();
+
+        // Pages: folder notes, icons and covers. Each registers its own
+        // events and checks its setting when they fire, so turning one off
+        // takes effect without a reload.
+        new FolderNotes(this);
+        this.explorerDecor = new ExplorerDecor(this);
+        this.pageHeaders = new PageHeaders(this);
+        this.linkIcons = new LinkIcons(this);
+        this.breadcrumbs = new Breadcrumbs(this);
+        new ExplorerAdd(this);
+        registerPageOptions(this);
+        registerPageSwitcher(this);
+        registerSubpages(this);
+        registerMentionSuggest(this);
+        registerLinkPaste(this);
+        this.addCommand({
+            id: 'apply-page-template',
+            name: 'Apply page template',
+            checkCallback: (checking) => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file || file.extension !== 'md' || !this.settings.enabled) return false;
+                if (!checking) pickTemplate(this, file);
+                return true;
+            },
+        });
+        this.addCommand({
+            id: 'import-iconize-icons',
+            name: 'Import icons from Iconize',
+            callback: () => void importIconizeIcons(this),
+        });
 
         // The same menu the "+" handle and the trigger character open, exposed
         // as a command so it can be given a real hotkey under Settings →
@@ -124,6 +173,10 @@ export default class NotionBlock extends Plugin {
     async saveSettings() {
         await this.saveData(this.settings);
         this.syncBulletClass();
+        this.explorerDecor?.refresh();
+        this.pageHeaders?.update();
+        this.linkIcons?.update();
+        this.breadcrumbs?.update();
         // Notify editor extensions that settings have changed
         this.app.workspace.updateOptions();
     }

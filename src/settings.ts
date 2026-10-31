@@ -16,6 +16,14 @@ import {
 } from './insertRegistry';
 import { InsertCommandModal } from './insertCommandModal';
 import { resolveBulletMarkers } from './bulletDepth';
+import { importIconizeIcons } from './iconizeImport';
+
+/** Plugins whose job the "Pages" settings now do. */
+const SUPERSEDED_PLUGINS = [
+    { id: 'folder-notes', name: 'Folder notes' },
+    { id: 'obsidian-icon-folder', name: 'Iconize' },
+    { id: 'pexels-banner', name: 'Pixel Banner' },
+];
 
 export interface BlockPluginSettings {
     enabled: boolean;
@@ -58,6 +66,18 @@ export interface BlockPluginSettings {
     bulletOrder: string[];
     /** Markers left out of the depth cycle. */
     bulletHidden: string[];
+    /** Folders open their note on click; the note is hidden inside them. */
+    folderNotes: boolean;
+    /** Icon and cover above a note's title, and icons in the file explorer. */
+    pageHeader: boolean;
+    /** Icons of folders that have no folder note to hold one, by folder path. */
+    folderIcons: Record<string, string>;
+    /** Typing @ suggests pages and dates to link. */
+    mentions: boolean;
+    /** Pasting a lone URL offers to keep it, title it or embed it. */
+    linkPasteMenu: boolean;
+    /** Folder whose notes are offered as templates on an empty page. Empty turns templates off. */
+    templatesFolder: string;
     /** The release whose "What's new" card was last shown. */
     lastSeenVersion?: string;
 }
@@ -109,6 +129,15 @@ export const DEFAULT_SETTINGS: BlockPluginSettings = {
     // whatever an order does not name.
     bulletOrder: [],
     bulletHidden: [],
+    // ON by default: both only act on what a vault already has (a folder
+    // note, an `icon` or `banner` field), apart from the "Add icon" and "Add
+    // cover" buttons that appear while hovering a note's title.
+    folderNotes: true,
+    pageHeader: true,
+    folderIcons: {},
+    templatesFolder: 'Templates',
+    mentions: true,
+    linkPasteMenu: true,
 };
 
 export class BlockPluginSettingTab extends PluginSettingTab {
@@ -256,11 +285,14 @@ export class BlockPluginSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Block-aware Cmd+A and Backspace')
+            .setName('Block keys')
             .setDesc(
                 'Cmd+A selects the block you are in, and again selects the note. '
                 + 'Backspace at the start of a block steps out one indent level, then drops the '
-                + 'list marker or heading, then merges into the block above.'
+                + 'list marker or heading, then merges into the block above. '
+                + 'Cmd+Shift+Up/Down moves blocks, Cmd+D duplicates them, and Esc selects the block: '
+                + 'then arrows move between blocks, Shift extends, Backspace deletes, Cmd+C/X copies '
+                + 'or cuts, Tab indents, and Enter or Esc goes back to editing.'
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.blockKeys)
@@ -270,8 +302,32 @@ export class BlockPluginSettingTab extends PluginSettingTab {
                 }));
 
         this.renderBulletDepth(containerEl);
+        this.renderPages(containerEl);
 
         new Setting(containerEl).setName('Insert menu').setHeading();
+
+        new Setting(containerEl)
+            .setName('@ mentions')
+            .setDesc('Typing @ suggests pages to link, and Today, Tomorrow, Yesterday and Now.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.mentions)
+                .onChange(async (value) => {
+                    this.plugin.settings.mentions = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Link paste menu')
+            .setDesc(
+                'Pasting a lone URL offers to keep it, turn it into a link titled with the page\'s title '
+                + '(fetched once), or embed it. Pasted over selected text, it links that text.'
+            )
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.linkPasteMenu)
+                .onChange(async (value) => {
+                    this.plugin.settings.linkPasteMenu = value;
+                    await this.plugin.saveSettings();
+                }));
 
         new Setting(containerEl)
             .setName('Show the "+" handle')
@@ -341,6 +397,73 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .setHeading();
 
         this.renderInsertItemList(containerEl);
+    }
+
+    private renderPages(containerEl: HTMLElement): void {
+        new Setting(containerEl).setName('Pages').setHeading();
+
+        new Setting(containerEl)
+            .setName('Folder notes')
+            .setDesc(
+                'A folder whose note sits inside it under the same name (Travel/Travel.md) opens that '
+                + 'note when clicked, and the note is hidden from the folder\'s contents. Renaming one '
+                + 'renames the other. The "Page" insert item makes the new page a sub-page.'
+            )
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.folderNotes)
+                .onChange(async (value) => {
+                    this.plugin.settings.folderNotes = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Page icons and covers')
+            .setDesc(
+                'An icon and a cover image above the title, read from the "icon" and "banner" '
+                + 'properties, as Iconize and Pixel Banner wrote them. Icons also show in the file explorer.'
+            )
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.pageHeader)
+                .onChange(async (value) => {
+                    this.plugin.settings.pageHeader = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Page templates folder')
+            .setDesc(
+                'Notes in this folder are offered under "Templates" on an empty page. '
+                + '{{title}}, {{date}} and {{time}} are filled in, {{date:FORMAT}} with a moment format. '
+                + 'Leave empty to turn templates off.'
+            )
+            .addText(text => text
+                .setPlaceholder('Templates')
+                .setValue(this.plugin.settings.templatesFolder)
+                .onChange(async (value) => {
+                    this.plugin.settings.templatesFolder = value.trim();
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Import icons from Iconize')
+            .setDesc(
+                'Copies the icons Iconize kept in its own settings: a note\'s into its "icon" property, '
+                + 'a folder\'s into its folder note, or into this plugin when the folder has none. '
+                + 'Icons already set are kept.'
+            )
+            .addButton(button => button
+                .setButtonText('Import')
+                .onClick(() => void importIconizeIcons(this.plugin)));
+
+        const plugins = (this.app as unknown as { plugins?: { plugins?: Record<string, unknown> } }).plugins?.plugins;
+        const superseded = SUPERSEDED_PLUGINS.filter(p => plugins?.[p.id]).map(p => p.name);
+        if (superseded.length > 0) {
+            containerEl.createDiv({
+                cls: 'ftn-setting-warning',
+                text: `Also enabled: ${superseded.join(', ')}. Disable them, or both will draw `
+                    + 'icons, covers and folder clicks.',
+            });
+        }
     }
 
     private renderBulletDepth(containerEl: HTMLElement): void {

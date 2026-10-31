@@ -7,6 +7,7 @@ import {
     insertBlock,
     insertImageFiles,
     insertNewPage,
+    insertDatabase,
     insertTableOfContents,
 } from "./blockTransform";
 import { matchesQuery } from "./slashTrigger";
@@ -288,6 +289,7 @@ class NotionBlockInsertMenu implements InsertMenuHandle {
         if (id === "blank") return () => this.insertBlankLine();
         if (id === "toc") return () => this.insertTableOfContents();
         if (id === "page") return () => this.createPage();
+        if (id === "database") return () => this.createDatabase();
         if (id === "image") return () => this.openImagePicker();
         if (id === "attachment") return () => this.openAttachmentPicker();
         return () => this.insert(id);
@@ -539,6 +541,11 @@ class NotionBlockInsertMenu implements InsertMenuHandle {
      */
     private createPage(): void {
         void insertNewPage(this.plugin, this.view, this.lineNo, this.removeRange());
+    }
+
+    /** The query range is read now, for the same reason as createPage. */
+    private createDatabase(): void {
+        void insertDatabase(this.plugin, this.view, this.lineNo, this.removeRange());
     }
 
     private openImagePicker(): boolean {

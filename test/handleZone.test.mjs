@@ -54,7 +54,7 @@ test("the opposite side allows only a sliver", () => {
 
 test("the slack on the handle's side clears the handle itself", () => {
 	// Otherwise the pointer leaves the zone while it is still on the button.
-	assert.ok(HANDLE_SIDE_SLACK > HANDLE_LEFT_GAP);
+	assert.ok(HANDLE_SIDE_SLACK > HANDLE_LEFT_GAP + HANDLE_ROW_WIDTH);
 });
 
 test("vertical bounds are the editor's, on both sides", () => {

@@ -18,6 +18,7 @@ import {
     toggleFoldAtLine,
     unfoldBlockEffect,
 } from "./blockFold";
+import { handleLineField, setHandleLine } from "./handleGutter";
 
 /**
  * How far the pointer must travel from a press on the drag handle before it
@@ -163,6 +164,11 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
 
     /** Held for the listeners above, which outlive any single update. */
     view: EditorView;
+
+    /** The line whose number the handle hides, as last asked for. */
+    gutterLine: number | null = null;
+    /** Pending frame that dispatches it; see syncGutterLine. */
+    gutterFrame: number | null = null;
 
     constructor(view: EditorView) {
         this.view = view;
@@ -508,10 +514,12 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
             // We add scrollTop because handleEl is a child of scrollDOM
             let top = (coords.top - m.scrollerTop) + m.scrollTop;
 
-            // Centering logic:
-            // Adjust to the vertical center of the first visual line
-            const lineHeight = coords.bottom - coords.top;
-            top += (lineHeight - this.handleHeight) / 2;
+            // Centre on the first visual row. A line holding a tall widget (an
+            // embedded image, a rendered table) reports the widget's whole
+            // height, which would put the handle halfway down it; capping at
+            // one text row keeps it level with the top, as Notion does.
+            const rowHeight = Math.min(coords.bottom - coords.top, view.defaultLineHeight);
+            top += (rowHeight - this.handleHeight) / 2;
 
             // Themes can center/pad .cm-line independently of .cm-content.
             // Use the line box rather than coords.left, which also includes list
@@ -592,7 +600,15 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
                 }
             }
 
-            this.handleEl.setCssStyles({ transform: `translate3d(${left}px, ${Math.round(top)}px, 0)` });
+            // A left-side row is anchored at its right edge (see
+            // HANDLE_LEFT_GAP); the percentage is of the row's own width, so
+            // hidden buttons take up no gutter.
+            const anchor = this.sideShown === "right" ? "" : " translateX(-100%)";
+            this.handleEl.setCssStyles({
+                transform: `translate3d(${left}px, ${Math.round(top)}px, 0)${anchor}`,
+            });
+            // Only a left-side handle sits in the line-number gutter.
+            this.syncGutterLine(this.sideShown === "left" ? this.hoveredLine : null);
             return true;
         } catch {
             this.hideHandle();
@@ -760,6 +776,7 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
     hideHandle() {
         this.hoveredLine = null;
         this.hoveredBand = null;
+        this.syncGutterLine(null);
         if (this.handleEl) {
             this.handleEl.classList.add("is-hidden");
         }
@@ -769,7 +786,34 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
         }
     }
 
+    /**
+     * Moves the hidden line number to `line` (see handleGutter.ts).
+     *
+     * Dispatched on the next frame, not here: this runs from update(), where
+     * CodeMirror forbids dispatching, as well as from pointer frames. Several
+     * calls within one frame collapse into the last. Without a line-number
+     * gutter there is nothing to hide, and no transaction is spent.
+     */
+    syncGutterLine(line: number | null) {
+        this.gutterLine = line;
+        if (this.gutterFrame !== null) return;
+        this.gutterFrame = this.ownerWindow.requestAnimationFrame(() => {
+            this.gutterFrame = null;
+            const view = this.view;
+            if (!view.dom.isConnected) return;
+            const current = view.state.field(handleLineField, false) ?? null;
+            const target = this.gutterLine;
+            const pos = target === null || target > view.state.doc.lines
+                ? null
+                : view.state.doc.line(target).from;
+            if (pos === current) return;
+            if (pos !== null && !view.dom.querySelector(".cm-lineNumbers")) return;
+            view.dispatch({ effects: setHandleLine.of(pos) });
+        });
+    }
+
     destroy() {
+        if (this.gutterFrame !== null) this.ownerWindow.cancelAnimationFrame(this.gutterFrame);
         closeNotionBlockActionMenus();
         closeNotionBlockInsertMenus();
         // A queued frame closes over the view, so letting it fire after teardown

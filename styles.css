@@ -9,7 +9,8 @@
     z-index: 10;
     pointer-events: all;
     background-color: transparent;
-    transition: transform 0.08s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    /* Opacity only: the handle jumps straight to the hovered row. */
+    transition: opacity 0.2s ease;
     opacity: 0;
 }
 
@@ -560,4 +561,373 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
 
 .block-drag-ghost-lines * {
     pointer-events: none;
+}
+
+/* A note in the file explorer a dragged block will be moved to on release. */
+.nav-file-title.is-block-drop-target {
+    background-color: hsla(var(--interactive-accent-hsl), 0.25);
+    color: var(--text-normal);
+}
+
+/* ---- Pages: explorer icons ---------------------------------------------
+ * What each icon draws comes from the generated #ftn-explorer-decor sheet;
+ * these only space it. A ::before without `content` does not exist, so rows
+ * with no icon are untouched. */
+
+.workspace-leaf-content[data-type="file-explorer"] .nav-file-title-content::before,
+.workspace-leaf-content[data-type="file-explorer"] .nav-folder-title-content::before {
+    display: inline-block;
+    min-width: 1em;
+    margin-inline-end: 0.35em;
+    text-align: center;
+}
+
+/* ---- Pages: header above the title ------------------------------------ */
+
+.ftn-page-header {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+/* Obsidian narrows each child of the Live Preview sizer to the readable line
+ * width by itself (the inline title included), not the sizer as a whole, so
+ * the header takes the same box to line up with the title and text. In
+ * Reading view it sits inside .mod-header, which already has that box. */
+.markdown-source-view.mod-cm6.is-readable-line-width .cm-sizer > .ftn-page-header {
+    max-width: var(--max-width);
+    width: var(--line-width);
+    margin-inline: var(--content-margin);
+}
+
+.ftn-page-header.has-cover {
+    margin-top: 0.5em;
+}
+
+/* Full pane width, as Notion's covers are: --ftn-cover-start and
+ * --ftn-cover-width are measured by pageHeader.ts (fitCover), since the
+ * header sits in the text column and the column's margins are `auto`. */
+.ftn-cover {
+    position: relative;
+    width: var(--ftn-cover-width, 100%);
+    height: clamp(160px, 30vh, 280px);
+    margin-inline-start: calc(-1 * var(--ftn-cover-start, 0px));
+    overflow: hidden;
+}
+
+.ftn-cover-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+}
+
+.ftn-cover.is-repositioning .ftn-cover-img {
+    cursor: grab;
+}
+
+.ftn-cover.is-repositioning .ftn-cover-img:active {
+    cursor: grabbing;
+}
+
+.ftn-cover-actions {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.ftn-cover:hover .ftn-cover-actions,
+.ftn-cover.is-repositioning .ftn-cover-actions {
+    opacity: 1;
+}
+
+.ftn-cover-actions .ftn-header-button {
+    background: var(--background-primary);
+    box-shadow: var(--shadow-s);
+}
+
+.ftn-page-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 78px;
+    height: 78px;
+    margin-top: 0.4em;
+    border-radius: var(--radius-m);
+    font-size: 64px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ftn-page-icon:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ftn-page-icon svg {
+    width: 60px;
+    height: 60px;
+    color: var(--text-muted);
+}
+
+/* Notion's overlap: the icon sits half on the cover. */
+.ftn-page-header.has-cover.has-icon .ftn-page-icon {
+    position: relative;
+    margin-top: -42px;
+}
+
+.ftn-page-header-actions {
+    display: flex;
+    gap: 4px;
+    min-height: 28px;
+    margin-top: 0.3em;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.ftn-page-header:hover .ftn-page-header-actions,
+.ftn-page-header:has(+ .inline-title:hover) .ftn-page-header-actions,
+.ftn-page-header:has(+ .inline-title:focus) .ftn-page-header-actions {
+    opacity: 1;
+}
+
+.ftn-header-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: var(--radius-s);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    cursor: pointer;
+}
+
+.ftn-header-button:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.ftn-header-button-icon {
+    display: flex;
+}
+
+.ftn-header-button-icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* ---- Pages: icon and cover pickers ------------------------------------ */
+
+.ftn-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ftn-picker-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    font-size: 18px;
+}
+
+.ftn-picker-label {
+    overflow: hidden;
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ftn-picker-thumb {
+    width: 64px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: var(--radius-s);
+    object-fit: cover;
+}
+
+/* The line number under the hover handle (see handleGutter.ts). Hidden, not
+ * removed, so the gutter keeps its width and the other numbers stay put. */
+.cm-lineNumbers .cm-gutterElement.ftn-handle-line {
+    visibility: hidden;
+}
+
+/* ---- Pages: icons beside links and on tabs ------------------------------ */
+
+.ftn-link-icon,
+.ftn-tab-icon,
+.ftn-crumb-icon {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-end: 0.25em;
+    vertical-align: -0.1em;
+}
+
+.ftn-link-icon svg,
+.ftn-tab-icon svg,
+.ftn-crumb-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+.ftn-tab-icon {
+    flex-shrink: 0;
+    font-size: var(--font-ui-small);
+}
+
+/* ---- Pages: breadcrumbs ------------------------------------------------- */
+
+.view-header-breadcrumb.ftn-crumb-page {
+    text-decoration: underline;
+    text-decoration-color: var(--text-faint);
+    text-underline-offset: 3px;
+}
+
+/* A folder note's own folder: "Travel / Travel" names one page twice. */
+.view-header-breadcrumb.ftn-crumb-self,
+.view-header-breadcrumb.ftn-crumb-self + .view-header-breadcrumb-separator {
+    display: none;
+}
+
+/* ---- Pages: "+" in the explorer ---------------------------------------- */
+
+.ftn-explorer-add {
+    display: none;
+    margin-inline-start: auto;
+    padding: 0 2px;
+    color: var(--icon-color);
+}
+
+.ftn-explorer-add svg {
+    width: 14px;
+    height: 14px;
+}
+
+.nav-folder-title:hover > .ftn-explorer-add,
+.nav-file-title:hover > .ftn-explorer-add {
+    display: flex;
+}
+
+/* ---- Pages: sub-pages block -------------------------------------------- */
+
+.ftn-subpages {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 4px 0;
+}
+
+.ftn-subpage {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 6px;
+    border-radius: var(--radius-s);
+    color: var(--text-normal);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.ftn-subpage:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ftn-subpage.is-unresolved {
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.ftn-subpage-icon {
+    display: flex;
+    width: 1.2em;
+    justify-content: center;
+}
+
+.ftn-subpage-icon svg {
+    width: 1em;
+    height: 1em;
+    color: var(--text-muted);
+}
+
+.ftn-subpage-name {
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ftn-subpages-empty {
+    color: var(--text-faint);
+    font-size: var(--font-ui-small);
+}
+
+/* ---- Toggle: a folded callout without the callout's box ----------------- */
+
+.callout[data-callout="toggle"] {
+    --callout-icon: chevron-right;
+    padding: 0;
+    border: none;
+    background: none;
+    mix-blend-mode: normal;
+}
+
+.callout[data-callout="toggle"] > .callout-title {
+    color: var(--text-normal);
+    font-weight: inherit;
+}
+
+/* The chevron on the right of the title is the fold control; the callout's
+ * own icon would be a second one. */
+.callout[data-callout="toggle"] > .callout-title > .callout-icon {
+    display: none;
+}
+
+.callout[data-callout="toggle"] > .callout-title > .callout-fold {
+    order: -1;
+    padding-inline-end: 4px;
+}
+
+.callout[data-callout="toggle"] > .callout-content {
+    padding-inline-start: 1.4em;
+}
+
+/* ---- Page options: Full width, Small text ------------------------------ */
+
+.markdown-source-view.ftn-wide,
+.markdown-preview-view.ftn-wide {
+    --file-line-width: 100%;
+}
+
+.markdown-source-view.ftn-small .cm-sizer,
+.markdown-preview-view.ftn-small .markdown-preview-sizer {
+    font-size: 0.875em;
+}
+
+/* ---- Go to page ---------------------------------------------------------- */
+
+.ftn-switcher-text {
+    min-width: 0;
+}
+
+.ftn-switcher-path {
+    overflow: hidden;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- @ mentions ---------------------------------------------------------- */
+
+.ftn-mention-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--icon-size);
 }

@@ -224,6 +224,7 @@ class NotionBlockActionMenu {
             { id: "bullet", label: t("menu.bullet"), icon: "list", action: () => this.runTransform("bullet") },
             { id: "numbered", label: t("menu.numbered"), icon: "list-ordered", action: () => this.runTransform("numbered") },
             { id: "blockquote", label: t("menu.blockquote"), icon: "quote", action: () => this.runTransform("blockquote") },
+            { id: "toggle", label: t("menu.toggle"), icon: "chevron-right", action: () => this.runTransform("toggle") },
             { id: "code", label: t("menu.code"), icon: "code", action: () => this.runTransform("code") },
             { id: "math", label: t("menu.math"), icon: "sigma", action: () => this.runTransform("math") },
             { id: "divider", label: t("menu.divider"), icon: "minus", action: () => this.runTransform("divider") },

@@ -1,11 +1,13 @@
 import { dispatchBlockEdit } from "./history";
 import { EditorView } from "@codemirror/view";
-import { moment, Notice } from "obsidian";
+import { moment, Notice, TFile } from "obsidian";
 import NotionBlock from "./main";
 import { t } from "./locale/helpers";
 import { InsertChange, planInsert } from "./insertPlan";
 import { toMarkdownLink } from "./attachmentLink";
 import { collectHeadings, prefixLines, quotePrefix, tableOfContents } from "./tableOfContents";
+import { subPageFolder } from "./folderNoteView";
+import { TOGGLE_PREFIX, databaseBlock, subpagesBlock } from "./pageBlocks";
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp"]);
 
@@ -104,11 +106,16 @@ export async function insertAttachmentFiles(
 }
 
 /**
- * Creates a note beside the current one and links to it, Notion's /page.
+ * Creates a note and links to it, Notion's /page.
  *
- * "Beside" is literal: the new note lands in the same folder as the note the
- * command was run from, not in a subfolder, because Obsidian has no notion of
- * a page owning another page — the link is the only relationship there is.
+ * With folder notes on, the new note is a sub-page: it goes in the current
+ * note's folder, and a note that is not a folder note yet becomes one first
+ * (`A/Note.md` moves to `A/Note/Note.md`). With them off, or when that move
+ * is blocked, it lands beside the current note, the link being the only
+ * relationship there is.
+ *
+ * The move comes before the link is written, so the link is generated from
+ * the note's final path.
  *
  * The link goes in first and the new note is opened second. Reversing that
  * would dispatch the insert into an editor that had already been swapped out
@@ -125,10 +132,12 @@ export async function insertNewPage(
     remove?: RemoveRange
 ): Promise<void> {
     const active = plugin.app.workspace.getActiveFile();
-    const sourcePath = active?.path ?? "";
-    const folder = active?.parent?.path ?? "";
 
     try {
+        const subFolder = active && plugin.settings.folderNotes ? await subPageFolder(plugin, active) : null;
+        // Read after the move, which changes both.
+        const sourcePath = active?.path ?? "";
+        const folder = subFolder ?? active?.parent?.path ?? "";
         const file = await plugin.app.vault.create(
             availableNotePath(plugin, folder, t("page.untitled")),
             ""
@@ -137,14 +146,40 @@ export async function insertNewPage(
         // the vault's own link style and disambiguates a basename that already
         // exists in another folder, which a bare wikilink would resolve to.
         insertTextAtLineEnd(view, lineNo, plugin.app.fileManager.generateMarkdownLink(file, sourcePath), false, remove);
-        await plugin.app.workspace.getLeaf(false).openFile(file);
+        // Title selected for renaming, as Notion puts the caret in a new page's title.
+        await plugin.app.workspace.getLeaf(false).openFile(file, { eState: { rename: "all" } });
     } catch {
         new Notice(t("notice.createPageFailed"));
     }
 }
 
+/**
+ * Inserts an inline database (an Obsidian Base) over the current note's
+ * sub-pages, Notion's /database. Like /page, it makes the note a folder note
+ * first when folder notes are on, since the rows are the pages in its folder.
+ */
+export async function insertDatabase(
+    plugin: NotionBlock,
+    view: EditorView,
+    lineNo: number,
+    remove?: RemoveRange
+): Promise<void> {
+    const active = plugin.app.workspace.getActiveFile();
+    if (!active) {
+        new Notice(t("notice.noActiveNote"));
+        return;
+    }
+    try {
+        const folder = plugin.settings.folderNotes ? await subPageFolder(plugin, active) : null;
+        insertTextAtLineEnd(view, lineNo, databaseBlock(folder ?? active.parent?.path ?? ""), true, remove);
+    } catch (error) {
+        console.error("feel-the-notion: inserting database failed", error);
+        new Notice("Could not insert the database");
+    }
+}
+
 /** First "Untitled", "Untitled 1", ... that no note is already using. */
-function availableNotePath(plugin: NotionBlock, folder: string, base: string): string {
+export function availableNotePath(plugin: NotionBlock, folder: string, base: string): string {
     // The vault root's path is "/", not "", so joining naively produces
     // "//Untitled.md" for every note that is not inside a folder.
     const prefix = folder && folder !== "/" ? `${folder}/` : "";
@@ -196,6 +231,13 @@ export function insertTableOfContents(
     insertTextAtLineEnd(view, lineNo, prefixLines(body, prefix, !onNewLine), onNewLine, remove);
 }
 
+/** Saves one file where Files & Links puts attachments for the note at `sourcePath`. */
+export async function saveAttachment(plugin: NotionBlock, file: File, sourcePath: string): Promise<TFile> {
+    const safeName = sanitizeAttachmentName(file.name);
+    const targetPath = await plugin.app.fileManager.getAvailablePathForAttachment(safeName, sourcePath);
+    return plugin.app.vault.createBinary(targetPath, await file.arrayBuffer());
+}
+
 async function saveAttachments(
     plugin: NotionBlock,
     files: File[],
@@ -205,9 +247,7 @@ async function saveAttachments(
     const links: string[] = [];
 
     for (const file of files) {
-        const safeName = sanitizeAttachmentName(file.name);
-        const targetPath = await plugin.app.fileManager.getAvailablePathForAttachment(safeName, sourcePath);
-        const savedFile = await plugin.app.vault.createBinary(targetPath, await file.arrayBuffer());
+        const savedFile = await saveAttachment(plugin, file, sourcePath);
         const generated = plugin.app.fileManager.generateMarkdownLink(savedFile, sourcePath);
         links.push(format(generated, savedFile.path));
     }
@@ -286,8 +326,8 @@ export function transformLine(view: EditorView, lineNo: number, targetType: stri
             case "h3": newText = "### " + content; break;
             case "h4": newText = "#### " + content; break;
             case "h5": newText = "##### " + content; break;
-            case "bullet": 
-            case "toggle": newText = "- " + content; break;
+            case "bullet": newText = "- " + content; break;
+            case "toggle": newText = TOGGLE_PREFIX + content; break;
             case "numbered": newText = "1. " + content; break;
             case "todo": newText = "- [ ] " + content; break;
             case "blockquote": newText = "> " + content; break;
@@ -341,7 +381,8 @@ export function insertBlock(
             case "h4": insertText = "#### "; break;
             case "h5": insertText = "##### "; break;
             case "todo": insertText = "- [ ] "; break;
-            case "toggle":
+            case "toggle": insertText = TOGGLE_PREFIX; break;
+            case "subpages": insertText = subpagesBlock(); break;
             case "bullet": insertText = "- "; break;
             case "numbered": insertText = "1. "; break;
             case "blockquote": insertText = "> "; break;

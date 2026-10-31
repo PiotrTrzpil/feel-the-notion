@@ -5,8 +5,16 @@ import {
 	ViewPlugin,
 	ViewUpdate,
 } from "@codemirror/view";
-import { EditorSelection, RangeSetBuilder, SelectionRange, Text } from "@codemirror/state";
+import {
+	EditorSelection,
+	RangeSetBuilder,
+	SelectionRange,
+	StateEffect,
+	StateField,
+	Text,
+} from "@codemirror/state";
 import type NotionBlock from "./main";
+import { BlockSelectionEnds, blockSelectionSpan } from "./blockKeys";
 
 /**
  * Notion-style multi-block selection.
@@ -32,6 +40,43 @@ import type NotionBlock from "./main";
  * characters they named, and snapping would fight them. Only a pointer drag
  * across a boundary means "I want these blocks".
  */
+
+/**
+ * An Esc block selection (see blockKeymap.ts): whole blocks selected as
+ * objects, with no caret, the way Notion's Esc leaves them.
+ *
+ * Kept as state beside the editor selection rather than read off it, because
+ * a single block is a selection inside one line, which the paint below
+ * deliberately leaves to CodeMirror; and because the keys that act on blocks
+ * have to know the user is in block mode, not merely holding a selection that
+ * happens to cover whole lines.
+ *
+ * The editor selection still spans the blocks, so native copy, drag and
+ * anything else reading the selection act on exactly what is painted.
+ */
+export interface BlockSelection extends BlockSelectionEnds {
+	/** Where the caret was on entering, so Esc can hand it back. */
+	caret: number;
+}
+
+/** Sets or (with null) clears the block selection. */
+export const setBlockSelection = StateEffect.define<BlockSelection | null>();
+
+export const blockSelectionField = StateField.define<BlockSelection | null>({
+	create: () => null,
+
+	update(value, tr) {
+		for (const effect of tr.effects) {
+			if (effect.is(setBlockSelection)) return effect.value;
+		}
+		// Every block command sets the field alongside its own edit. Any other
+		// edit or selection change (a click, Home, typing elsewhere, undo)
+		// means the user has left block mode, and the recorded lines would no
+		// longer describe what is on screen.
+		if (tr.docChanged || tr.selection) return null;
+		return value;
+	},
+});
 
 /** Full-width tint on a whole line. Paint only — never touches geometry. */
 const blockSelected = Decoration.line({ class: "ftn-block-selected" });
@@ -77,7 +122,14 @@ function buildDecorations(view: EditorView): DecorationSet {
 	const builder = new RangeSetBuilder<Decoration>();
 	const doc = view.state.doc;
 
-	for (const n of selectedLines(doc, view.state.selection.ranges)) {
+	const lines = new Set(selectedLines(doc, view.state.selection.ranges));
+	const blocks = view.state.field(blockSelectionField, false);
+	if (blocks) {
+		const span = blockSelectionSpan(doc, blocks);
+		for (let n = span.firstLine; n <= span.lastLine; n++) lines.add(n);
+	}
+
+	for (const n of [...lines].sort((a, b) => a - b)) {
 		const line = doc.line(n);
 		// A line decoration is added as a zero-length range at line start.
 		builder.add(line.from, line.from, blockSelected);
@@ -88,6 +140,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 
 export function blockSelectionExtension(plugin: NotionBlock) {
 	return [
+		blockSelectionField,
 		ViewPlugin.fromClass(
 			class {
 				decorations: DecorationSet;
@@ -97,7 +150,10 @@ export function blockSelectionExtension(plugin: NotionBlock) {
 				}
 
 				update(update: ViewUpdate) {
-					if (update.docChanged || update.viewportChanged || update.selectionSet) {
+					const blocksChanged =
+						update.startState.field(blockSelectionField, false) !==
+						update.state.field(blockSelectionField, false);
+					if (update.docChanged || update.viewportChanged || update.selectionSet || blocksChanged) {
 						this.decorations = buildDecorations(update.view);
 					}
 

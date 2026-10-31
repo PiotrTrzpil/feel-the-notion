@@ -1,5 +1,6 @@
 import { ChangeSet, Text } from "@codemirror/state";
-import { reindentBlock } from "./dragRange";
+import { LineSpan, reindentBlock } from "./dragRange";
+import { planCut } from "./fileDrop";
 
 /**
  * Works out the exact edits that move a block, as a single change set.
@@ -70,27 +71,43 @@ export function planBlockMove(
 		return [{ from: source.from, to: source.to, insert: text }];
 	}
 
-	// The source span plus the newline that terminates it. When the block runs
-	// to the end of the document there is no trailing newline to remove, so the
-	// PRECEDING one is taken instead — otherwise the document keeps a blank
-	// line where the block used to be.
-	const atDocEnd = source.to >= doc.length;
-	const cutFrom = atDocEnd ? Math.max(0, source.from - 1) : source.from;
-	const cutTo = atDocEnd ? doc.length : Math.min(source.to + 1, doc.length);
+	const cut = planCut(doc, source);
 
 	// Appending past the last line.
 	if (toLineNo > doc.lines) {
-		return [
-			{ from: doc.length, insert: "\n" + text },
-			{ from: cutFrom, to: cutTo },
-		];
+		return [{ from: doc.length, insert: "\n" + text }, cut];
 	}
 
 	const toLine = doc.line(toLineNo);
 
+	return [{ from: toLine.from, insert: text + "\n" }, cut];
+}
+
+/**
+ * Swaps two sibling blocks, `upper` above `lower`, as one change.
+ *
+ * The keyboard move (Cmd+Shift+Up/Down) uses this rather than planBlockMove.
+ * A drag drops a block BEFORE a line, so when blank lines separate the two
+ * blocks the move carries the gap along: "alpha, blank, bravo" dragged below
+ * bravo becomes "blank, bravo, alpha". Stepping one sibling over another has
+ * to leave the document's spacing where it was, so whatever lies between the
+ * two spans stays between them.
+ *
+ * One replacement over both spans, so there is nothing to overlap and the
+ * whole step is a single undo entry.
+ */
+export function planBlockSwap(doc: Text, upper: LineSpan, lower: LineSpan): MoveChange[] {
+	const upperFrom = doc.line(upper.firstLine).from;
+	const upperTo = doc.line(upper.lastLine).to;
+	const lowerFrom = doc.line(lower.firstLine).from;
+	const lowerTo = doc.line(lower.lastLine).to;
+	const gap = doc.sliceString(upperTo, lowerFrom);
 	return [
-		{ from: toLine.from, insert: text + "\n" },
-		{ from: cutFrom, to: cutTo },
+		{
+			from: upperFrom,
+			to: lowerTo,
+			insert: doc.sliceString(lowerFrom, lowerTo) + gap + doc.sliceString(upperFrom, upperTo),
+		},
 	];
 }
 

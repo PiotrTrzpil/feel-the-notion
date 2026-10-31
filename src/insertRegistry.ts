@@ -84,8 +84,11 @@ export const BUILTIN_ITEMS: readonly RegistryItem[] = [
 	{ id: "divider", sectionKey: "insert", labelKey: "menu.divider", icon: "minus", keywords: ["hr", "---", "rule", "separator", "line", "break"] },
 	{ id: "toc", sectionKey: "insert", labelKey: "menu.toc", icon: "list-ordered", keywords: ["toc", "contents", "outline", "headings", "index"] },
 	{ id: "callout", sectionKey: "insert", labelKey: "menu.callout", icon: "pencil", keywords: ["admonition"] },
+	{ id: "toggle", sectionKey: "insert", labelKey: "menu.toggle", icon: "chevron-right", keywords: ["toggle", "collapse", "fold", "details", "dropdown"] },
 
 	{ id: "page", sectionKey: "inline", labelKey: "menu.page", icon: "file-plus", keywords: ["note", "subpage", "new"] },
+	{ id: "subpages", sectionKey: "inline", labelKey: "menu.subpages", icon: "files", keywords: ["sub-pages", "children", "child pages", "list pages"] },
+	{ id: "database", sectionKey: "inline", labelKey: "menu.database", icon: "table-2", keywords: ["base", "bases", "table view", "inline database"] },
 	{ id: "link", sectionKey: "inline", labelKey: "menu.link", icon: "link", keywords: ["wikilink", "[["] },
 	{ id: "ext-link", sectionKey: "inline", labelKey: "menu.extLink", icon: "link-2", keywords: ["url"] },
 	{ id: "image", sectionKey: "inline", labelKey: "menu.image", icon: "image", keywords: ["photo", "picture"] },
