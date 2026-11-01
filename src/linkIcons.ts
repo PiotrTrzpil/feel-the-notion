@@ -54,13 +54,14 @@ function isInCode(view: EditorView, pos: number): boolean {
 }
 
 function buildDecorations(plugin: NotionBlock, view: EditorView): DecorationSet {
-	const builder = new RangeSetBuilder<Decoration>();
+	const ranges = new RangeSetBuilder<Decoration>();
 	const { settings, app } = plugin;
-	if (!settings.enabled || !settings.pageHeader) return builder.finish();
+	if (!settings.enabled || !settings.pageHeader) return ranges.finish();
 	const sourcePath = view.state.field(editorInfoField, false)?.file?.path ?? "";
 
-	for (const { from, to } of view.visibleRanges) {
-		const text = view.state.sliceDoc(from, to);
+	for (const visible of view.visibleRanges) {
+		const { from } = visible;
+		const text = view.state.sliceDoc(from, visible.to);
 		for (const link of findLinks(text)) {
 			if (link.embed) continue;
 			const pos = from + link.from;
@@ -69,10 +70,10 @@ function buildDecorations(plugin: NotionBlock, view: EditorView): DecorationSet 
 			if (!target || target.extension !== "md") continue;
 			const icon = pageIconOf(plugin, target);
 			if (!icon) continue;
-			builder.add(pos, pos, Decoration.widget({ widget: new LinkIconWidget(icon), side: -1 }));
+			ranges.add(pos, pos, Decoration.widget({ widget: new LinkIconWidget(icon), side: -1 }));
 		}
 	}
-	return builder.finish();
+	return ranges.finish();
 }
 
 export function linkIconsExtension(plugin: NotionBlock) {
@@ -80,8 +81,8 @@ export function linkIconsExtension(plugin: NotionBlock) {
 		class {
 			decorations: DecorationSet;
 
-			constructor(view: EditorView) {
-				this.decorations = buildDecorations(plugin, view);
+			constructor(editor: EditorView) {
+				this.decorations = buildDecorations(plugin, editor);
 			}
 
 			update(update: ViewUpdate) {
@@ -155,7 +156,7 @@ export class LinkIcons {
 	}
 
 	private decorateTabs(): void {
-		const { settings } = this.plugin;
+		const settings = this.plugin.settings;
 		this.plugin.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
 			const titleEl = (leaf as unknown as TabHeaderLeaf).tabHeaderInnerTitleEl;
 			if (!titleEl?.parentElement) return;

@@ -22,8 +22,8 @@ import { handleLineField, setHandleLine } from "./handleGutter";
 
 /**
  * How far the pointer must travel from a press on the drag handle before it
- * becomes a drag. Notion's own figure, measured at 7 px
- * (docs/notion-drag-research.md §7). Released sooner, the press is a click
+ * becomes a drag. Notion's own figure, measured at 7 px.
+ * Released sooner, the press is a click
  * and opens the block menu.
  */
 const DRAG_THRESHOLD_PX = 7;
@@ -170,29 +170,29 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
     /** Pending frame that dispatches it; see syncGutterLine. */
     gutterFrame: number | null = null;
 
-    constructor(view: EditorView) {
-        this.view = view;
-        this.ownerWindow = view.dom.ownerDocument.defaultView ?? activeWindow;
+    constructor(editor: EditorView) {
+        this.view = editor;
+        this.ownerWindow = editor.dom.ownerDocument.defaultView ?? activeWindow;
         this.scheduler = new FrameScheduler(this.ownerWindow);
-        this.scrollEl = view.scrollDOM;
-        this.createHandle(view);
+        this.scrollEl = editor.scrollDOM;
+        this.createHandle(editor);
 
         // ViewPlugin.update() does not fire at construction, so without this a
         // freshly opened pane in always-visible mode would show no handle
         // until a selection, doc, or viewport change happened.
         this.alwaysVisibleShown = plugin.settings.handleAlwaysVisible;
         if (plugin.settings.handleAlwaysVisible) {
-            this.followCaret(view);
+            this.followCaret(editor);
         }
 
         // Both cached rects and the hovered band are viewport-relative, so they
         // stop being true the moment the editor scrolls or the window resizes.
-        view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
+        editor.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
         this.ownerWindow.addEventListener("resize", this.onResize);
 
         // See onPointerMove: these belong on the scroller, not on contentDOM.
-        view.scrollDOM.addEventListener("mousemove", this.onPointerMove, { passive: true });
-        view.scrollDOM.addEventListener("mouseleave", this.onPointerLeave);
+        editor.scrollDOM.addEventListener("mousemove", this.onPointerMove, { passive: true });
+        editor.scrollDOM.addEventListener("mouseleave", this.onPointerLeave);
     }
 
     createHandle(view: EditorView) {

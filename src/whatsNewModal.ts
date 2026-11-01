@@ -23,7 +23,7 @@ export class WhatsNewModal extends Modal {
         new Setting(this.contentEl).addButton((button) => button
             .setButtonText('Dismiss')
             .setCta()
-            .onClick(() => this.close()));
+            .onClick(() => { this.close(); }));
     }
 
     onClose(): void {

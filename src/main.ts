@@ -38,8 +38,8 @@ export default class NotionBlock extends Plugin {
     async onload() {
         const hadSavedData = await this.loadSettings();
 
-        // Register the CodeMirror 6 extension for hover handles
-        this.registerEditorExtension([
+        // CodeMirror 6 extensions: handles, selection, keys, menus, folding
+        const editorExtensions = [
             blockHandlesExtension(this),
             hideSyntaxExtension(this),
             blockSelectionExtension(this),
@@ -49,7 +49,8 @@ export default class NotionBlock extends Plugin {
             bulletDepthExtension(() => this.bulletMarkers()),
             dropParentTintField,
             handleLineField,
-        ]);
+        ];
+        this.registerEditorExtension(editorExtensions);
         this.syncBulletClass();
 
         // Pages: folder notes, icons and covers. Each registers its own
@@ -69,10 +70,10 @@ export default class NotionBlock extends Plugin {
         this.addCommand({
             id: 'apply-page-template',
             name: 'Apply page template',
-            checkCallback: (checking) => {
-                const file = this.app.workspace.getActiveFile();
-                if (!file || file.extension !== 'md' || !this.settings.enabled) return false;
-                if (!checking) pickTemplate(this, file);
+            checkCallback: (dryRun: boolean) => {
+                const note = this.app.workspace.getActiveFile();
+                if (!note || note.extension !== 'md' || !this.settings.enabled) return false;
+                if (!dryRun) pickTemplate(this, note);
                 return true;
             },
         });
@@ -143,7 +144,7 @@ export default class NotionBlock extends Plugin {
 
     private async markWhatsNewSeen(): Promise<void> {
         this.settings.lastSeenVersion = this.manifest.version;
-        await this.saveData(this.settings);
+        await this.writeSettings();
     }
 
     private openInsertMenuAtCursor(editor: Editor): void {
@@ -166,12 +167,17 @@ export default class NotionBlock extends Plugin {
     /** Returns whether saved settings existed, which is how an update is told from a fresh install. */
     async loadSettings(): Promise<boolean> {
         const data = await this.loadData() as Partial<BlockPluginSettings> | null;
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+        this.settings = { ...DEFAULT_SETTINGS, ...data };
         return data !== null;
     }
 
+    /** Writes settings to disk without the refresh saveSettings does. */
+    private writeSettings(): Promise<void> {
+        return this.saveData(this.settings);
+    }
+
     async saveSettings() {
-        await this.saveData(this.settings);
+        await this.writeSettings();
         this.syncBulletClass();
         this.explorerDecor?.refresh();
         this.pageHeaders?.update();

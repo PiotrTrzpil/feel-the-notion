@@ -44,9 +44,9 @@ export class PageHeaders {
 	 * the text column, so the cover's reach to the pane's edges is measured
 	 * rather than expressible in CSS (`--content-margin` is `auto`).
 	 */
-	private readonly resizeObserver = new ResizeObserver((entries) => {
-		for (const entry of entries) {
-			entry.target.querySelectorAll<HTMLElement>(`.${HEADER_CLASS}.has-cover`).forEach((h) => fitCover(h));
+	private readonly coverObserver = new ResizeObserver((entries) => {
+		for (const { target } of entries) {
+			target.querySelectorAll<HTMLElement>(`.${HEADER_CLASS}.has-cover`).forEach((h) => fitCover(h));
 		}
 	});
 	private readonly observed = new Set<Element>();
@@ -60,7 +60,7 @@ export class PageHeaders {
 		plugin.registerEvent(app.vault.on("rename", () => this.refresh()));
 		app.workspace.onLayoutReady(() => this.renderAll());
 		plugin.register(() => {
-			this.resizeObserver.disconnect();
+			this.coverObserver.disconnect();
 			document.querySelectorAll(`.${HEADER_CLASS}`).forEach((el) => el.remove());
 		});
 	}
@@ -77,7 +77,7 @@ export class PageHeaders {
 		// Closed panes leave their scrollers behind; observing one keeps it alive.
 		for (const el of this.observed) {
 			if (el.isConnected) continue;
-			this.resizeObserver.unobserve(el);
+			this.coverObserver.unobserve(el);
 			this.observed.delete(el);
 		}
 	}
@@ -113,7 +113,7 @@ export class PageHeaders {
 		const scroller = scrollerOf(header);
 		if (!scroller || this.observed.has(scroller)) return;
 		this.observed.add(scroller);
-		this.resizeObserver.observe(scroller);
+		this.coverObserver.observe(scroller);
 	}
 
 	private coverPaint(cover: Cover, file: TFile): CoverPaint | null {

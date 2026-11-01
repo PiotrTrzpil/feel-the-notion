@@ -153,6 +153,12 @@ export class BlockPluginSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    /** Stores one setting and persists it, refreshing everything that reads settings. */
+    private store<K extends keyof BlockPluginSettings>(key: K, value: BlockPluginSettings[K]): Promise<void> {
+        this.plugin.settings[key] = value;
+        return this.plugin.saveSettings();
+    }
+
     display(): void {
         const { containerEl } = this;
 
@@ -163,22 +169,16 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .setDesc(t('settings.enablePlugin.desc'))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enabled)
-                .onChange(async (value) => {
-                    this.plugin.settings.enabled = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('enabled', value)));
 
         new Setting(containerEl)
             .setName(t('settings.dragGranularity.name'))
             .setDesc(t('settings.dragGranularity.desc'))
-            .addDropdown(dropdown => dropdown
+            .addDropdown((menu) => menu
                 .addOption('line', t('settings.dragGranularity.line'))
                 .addOption('paragraph', t('settings.dragGranularity.paragraph'))
                 .setValue(this.plugin.settings.dragGranularity)
-                .onChange(async (value: 'line' | 'paragraph') => {
-                    this.plugin.settings.dragGranularity = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value: 'line' | 'paragraph') => this.store('dragGranularity', value)));
 
         new Setting(containerEl)
             .setName(t('settings.hoverDelay.name'))
@@ -186,10 +186,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .addSlider(slider => slider
                 .setLimits(0, 500, 50)
                 .setValue(this.plugin.settings.hoverDelay)
-                .onChange(async (value) => {
-                    this.plugin.settings.hoverDelay = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('hoverDelay', value)));
 
         new Setting(containerEl)
             .setName(t('settings.hideDelay.name'))
@@ -197,42 +194,30 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .addSlider(slider => slider
                 .setLimits(0, 1000, 50)
                 .setValue(this.plugin.settings.hideDelay)
-                .onChange(async (value) => {
-                    this.plugin.settings.hideDelay = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('hideDelay', value)));
 
         new Setting(containerEl)
             .setName(t('settings.handleSide.name'))
             .setDesc(t('settings.handleSide.desc'))
-            .addDropdown(dropdown => dropdown
+            .addDropdown((menu) => menu
                 .addOption('left', t('settings.handleSide.left'))
                 .addOption('right', t('settings.handleSide.right'))
                 .setValue(this.plugin.settings.handleSide)
-                .onChange(async (value: 'left' | 'right') => {
-                    this.plugin.settings.handleSide = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value: 'left' | 'right') => this.store('handleSide', value)));
 
         new Setting(containerEl)
             .setName(t('settings.handleAlwaysVisible.name'))
             .setDesc(t('settings.handleAlwaysVisible.desc'))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.handleAlwaysVisible)
-                .onChange(async (value) => {
-                    this.plugin.settings.handleAlwaysVisible = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('handleAlwaysVisible', value)));
 
         new Setting(containerEl)
             .setName(t('settings.foldHandle.name'))
             .setDesc(t('settings.foldHandle.desc'))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.foldHandle)
-                .onChange(async (value) => {
-                    this.plugin.settings.foldHandle = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('foldHandle', value)));
 
         new Setting(containerEl)
             .setName(t('settings.dateFormat.name'))
@@ -240,10 +225,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('YYYY-MM-DD')
                 .setValue(this.plugin.settings.dateFormat)
-                .onChange(async (value) => {
-                    this.plugin.settings.dateFormat = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('dateFormat', value)));
 
         new Setting(containerEl)
             .setName(t('settings.timeFormat.name'))
@@ -251,10 +233,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('HH:mm')
                 .setValue(this.plugin.settings.timeFormat)
-                .onChange(async (value) => {
-                    this.plugin.settings.timeFormat = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('timeFormat', value)));
 
         new Setting(containerEl)
             .setName('Hide syntax markers')
@@ -265,10 +244,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.hideSyntaxMarkers)
-                .onChange(async (value) => {
-                    this.plugin.settings.hideSyntaxMarkers = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('hideSyntaxMarkers', value)));
 
         new Setting(containerEl)
             .setName('Snap selection to whole blocks')
@@ -279,10 +255,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.snapSelectionToBlocks)
-                .onChange(async (value) => {
-                    this.plugin.settings.snapSelectionToBlocks = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('snapSelectionToBlocks', value)));
 
         new Setting(containerEl)
             .setName('Block keys')
@@ -296,10 +269,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.blockKeys)
-                .onChange(async (value) => {
-                    this.plugin.settings.blockKeys = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('blockKeys', value)));
 
         this.renderBulletDepth(containerEl);
         this.renderPages(containerEl);
@@ -311,10 +281,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .setDesc('Typing @ suggests pages to link, and Today, Tomorrow, Yesterday and Now.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.mentions)
-                .onChange(async (value) => {
-                    this.plugin.settings.mentions = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('mentions', value)));
 
         new Setting(containerEl)
             .setName('Link paste menu')
@@ -324,20 +291,14 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.linkPasteMenu)
-                .onChange(async (value) => {
-                    this.plugin.settings.linkPasteMenu = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('linkPasteMenu', value)));
 
         new Setting(containerEl)
             .setName('Show the "+" handle')
             .setDesc('The button beside the drag handle that opens the insert menu.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.plusHandle)
-                .onChange(async (value) => {
-                    this.plugin.settings.plusHandle = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('plusHandle', value)));
 
         new Setting(containerEl)
             .setName('Open the insert menu by typing')
@@ -347,10 +308,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.slashMenu)
-                .onChange(async (value) => {
-                    this.plugin.settings.slashMenu = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('slashMenu', value)));
 
         new Setting(containerEl)
             .setName('Trigger character')
@@ -358,10 +316,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('/')
                 .setValue(this.plugin.settings.slashTrigger)
-                .onChange(async (value) => {
-                    this.plugin.settings.slashTrigger = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('slashTrigger', value)));
 
         new Setting(containerEl)
             .setName('Open it mid-line too')
@@ -372,10 +327,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.slashInline)
-                .onChange(async (value) => {
-                    this.plugin.settings.slashInline = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('slashInline', value)));
 
         new Setting(containerEl)
             .setName('Embed inserted attachments')
@@ -386,10 +338,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.embedAttachments)
-                .onChange(async (value) => {
-                    this.plugin.settings.embedAttachments = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('embedAttachments', value)));
 
         new Setting(containerEl)
             .setName(t('settings.insertItems.name'))
@@ -411,10 +360,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.folderNotes)
-                .onChange(async (value) => {
-                    this.plugin.settings.folderNotes = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('folderNotes', value)));
 
         new Setting(containerEl)
             .setName('Page icons and covers')
@@ -424,10 +370,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.pageHeader)
-                .onChange(async (value) => {
-                    this.plugin.settings.pageHeader = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('pageHeader', value)));
 
         new Setting(containerEl)
             .setName('Page templates folder')
@@ -439,10 +382,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('Templates')
                 .setValue(this.plugin.settings.templatesFolder)
-                .onChange(async (value) => {
-                    this.plugin.settings.templatesFolder = value.trim();
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('templatesFolder', value.trim())));
 
         new Setting(containerEl)
             .setName('Import icons from Iconize')
@@ -479,10 +419,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.bulletDepth)
-                .onChange(async (value) => {
-                    this.plugin.settings.bulletDepth = value;
-                    await this.plugin.saveSettings();
-                }));
+                .onChange((value) => this.store('bulletDepth', value)));
 
         // Two transaction filters with different sequences would each rewrite
         // the other's markers on every edit, the last one registered winning.
@@ -543,8 +480,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             toggle.disabled = isOn && enabled.length === 1;
             toggle.addEventListener('change', () => {
                 const hidden = settings.bulletHidden.filter((m) => m !== marker);
-                settings.bulletHidden = toggle.checked ? hidden : [...hidden, marker];
-                void this.plugin.saveSettings();
+                void this.store('bulletHidden', toggle.checked ? hidden : [...hidden, marker]);
                 // Repaint: every row's level number shifts when one goes on or off.
                 this.refreshBulletList();
             });
@@ -564,8 +500,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
                 row.removeClass('is-drop-target');
                 const from = Number(event.dataTransfer?.getData('text/plain'));
                 if (from === index) return;
-                settings.bulletOrder = reorderIds(order, from, index);
-                void this.plugin.saveSettings();
+                void this.store('bulletOrder', reorderIds(order, from, index));
                 this.refreshBulletList();
             });
         });
@@ -611,7 +546,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
         this.plugin.settings.insertOrder = next.insertOrder;
         this.plugin.settings.insertHidden = next.insertHidden;
         this.plugin.settings.insertCustom = next.insertCustom;
-        await this.plugin.saveSettings();
+        return this.plugin.saveSettings();
         this.refreshInsertList();
     }
 
@@ -676,8 +611,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             // the list under the pointer would fight the click that got here.
             toggle.addEventListener('change', () => {
                 const next = setItemHidden(this.plugin.settings, item.id, !toggle.checked);
-                this.plugin.settings.insertHidden = next.insertHidden;
-                void this.plugin.saveSettings();
+                void this.store('insertHidden', next.insertHidden);
             });
 
             if (custom) {

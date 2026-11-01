@@ -376,8 +376,7 @@ export class DragManager {
         // ---- COMPUTE ------------------------------------------------------
         // A short block splits at its midpoint. A tall one keeps the line on
         // its top edge and switches to the bottom edge only near the bottom,
-        // so a long block does not flip its drop line halfway down it
-        // (docs/notion-drag-research.md §7).
+        // so a long block does not flip its drop line halfway down it.
         const below = block.height > TALL_BLOCK_PX
             ? mouseY >= blockTop + block.height - BOTTOM_EDGE_PX
             : mouseY > blockTop + block.height / 2;

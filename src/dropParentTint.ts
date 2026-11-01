@@ -7,7 +7,7 @@ import { LineSpan } from "./dragRange";
  *
  * In Notion the drop lines for every legal depth overlap into one bar, so the
  * faint tint on the would-be parent is what actually shows how deep a block
- * will land (docs/notion-drag-research.md §7). A line decoration rather than an
+ * will land. A line decoration rather than an
  * overlay: CodeMirror paints it with the line, so it can never drift from the
  * text it marks, and it maps through any edit that lands mid-drag.
  *
@@ -29,13 +29,13 @@ export const dropParentTintField = StateField.define<DecorationSet>({
 				deco = Decoration.none;
 				continue;
 			}
-			const builder = new RangeSetBuilder<Decoration>();
+			const decorations = new RangeSetBuilder<Decoration>();
 			const last = Math.min(span.lastLine, tr.state.doc.lines);
 			for (let n = span.firstLine; n <= last; n++) {
 				const from = tr.state.doc.line(n).from;
-				builder.add(from, from, tint);
+				decorations.add(from, from, tint);
 			}
-			deco = builder.finish();
+			deco = decorations.finish();
 		}
 		return deco;
 	},

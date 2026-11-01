@@ -1,8 +1,8 @@
 /**
  * The drag's headline guarantee, checked over every move a user could make.
  *
- * Notion never lets a drop re-parent anything it was not aimed at
- * (docs/notion-drag-research.md §3). In list terms: after ANY legal drop,
+ * Notion never lets a drop re-parent anything it was not aimed at.
+ * In list terms: after ANY legal drop,
  *   (a) every line that did not move keeps the parent it had, and
  *   (b) the moved block's parent is the one the drop tint named.
  *

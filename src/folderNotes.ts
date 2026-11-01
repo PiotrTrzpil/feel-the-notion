@@ -1,9 +1,8 @@
 /**
  * Folder notes: a folder that is also a page, as in Notion.
  *
- * The note for folder `A/B` is `A/B/B.md`: inside the folder, named after it.
- * That is the "inside folder" layout of the Folder notes plugin, so vaults
- * that used it keep working unchanged.
+ * The note for folder `A/B` is `A/B/B.md`: inside the folder, named after it,
+ * so it moves and is renamed together with the folder.
  *
  * Path arithmetic only, DOM- and obsidian-free. See test/folderNotes.test.mjs.
  */

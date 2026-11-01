@@ -119,7 +119,7 @@ export function snapRangeToBlocks(doc: Text, range: SelectionRange): SelectionRa
 }
 
 function buildDecorations(view: EditorView): DecorationSet {
-	const builder = new RangeSetBuilder<Decoration>();
+	const ranges = new RangeSetBuilder<Decoration>();
 	const doc = view.state.doc;
 
 	const lines = new Set(selectedLines(doc, view.state.selection.ranges));
@@ -132,10 +132,10 @@ function buildDecorations(view: EditorView): DecorationSet {
 	for (const n of [...lines].sort((a, b) => a - b)) {
 		const line = doc.line(n);
 		// A line decoration is added as a zero-length range at line start.
-		builder.add(line.from, line.from, blockSelected);
+		ranges.add(line.from, line.from, blockSelected);
 	}
 
-	return builder.finish();
+	return ranges.finish();
 }
 
 export function blockSelectionExtension(plugin: NotionBlock) {
@@ -145,8 +145,8 @@ export function blockSelectionExtension(plugin: NotionBlock) {
 			class {
 				decorations: DecorationSet;
 
-				constructor(view: EditorView) {
-					this.decorations = buildDecorations(view);
+				constructor(editor: EditorView) {
+					this.decorations = buildDecorations(editor);
 				}
 
 				update(update: ViewUpdate) {

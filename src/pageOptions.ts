@@ -20,10 +20,10 @@ export function registerPageOptions(plugin: NotionBlock): void {
 		plugin.addCommand({
 			id: `toggle-page-${option}`,
 			name: `Toggle ${LABELS[option].toLowerCase()} for this page`,
-			checkCallback: (checking) => {
+			checkCallback: (dryRun: boolean) => {
 				const file = plugin.app.workspace.getActiveFile();
 				if (!file || file.extension !== "md" || !plugin.settings.enabled) return false;
-				if (!checking) void toggle(plugin, file, option);
+				if (!dryRun) void toggle(plugin, file, option);
 				return true;
 			},
 		});

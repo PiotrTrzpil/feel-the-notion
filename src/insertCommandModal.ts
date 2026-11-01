@@ -156,7 +156,7 @@ export class InsertCommandModal extends Modal {
 				}))
 			.addButton((button) => button
 				.setButtonText(t("settings.customCommand.cancel"))
-				.onClick(() => this.close()));
+				.onClick(() => { this.close(); }));
 	}
 
 	private renderIconPreview(): void {

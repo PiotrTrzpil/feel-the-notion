@@ -43,30 +43,30 @@ import type NotionBlock from "./main";
 const hiddenMarker = Decoration.replace({});
 
 function buildDecorations(view: EditorView): DecorationSet {
-	const builder = new RangeSetBuilder<Decoration>();
+	const ranges = new RangeSetBuilder<Decoration>();
 	// One document scan per pass rather than one per visible line — findFencedLines
 	// is O(docLines) total, so calling isInsideCodeFence per line here instead
 	// would make this whole function O(lines × docLines) on every keystroke.
 	const fencedLines = findFencedLines(view.state.doc);
 
-	for (const { from, to } of view.visibleRanges) {
-		let pos = from;
-		while (pos <= to) {
+	for (const visible of view.visibleRanges) {
+		let pos = visible.from;
+		while (pos <= visible.to) {
 			const line = view.state.doc.lineAt(pos);
 			// Inside a fence nothing is markdown — the fenced content itself has no
 			// idea it's in a block, which is what let e.g. `_VARIABLE_A_` get its
 			// underscores hidden as if they were emphasis markers.
 			if (!fencedLines.has(line.number)) {
 				for (const range of findMarkerRanges(line.text, line.from)) {
-					builder.add(range.from, range.to, hiddenMarker);
+					ranges.add(range.from, range.to, hiddenMarker);
 				}
 			}
-			if (line.to + 1 > to) break;
+			if (line.to + 1 > visible.to) break;
 			pos = line.to + 1;
 		}
 	}
 
-	return builder.finish();
+	return ranges.finish();
 }
 
 export function hideSyntaxExtension(plugin: NotionBlock) {
@@ -75,9 +75,9 @@ export function hideSyntaxExtension(plugin: NotionBlock) {
 			class {
 				decorations: DecorationSet;
 
-				constructor(view: EditorView) {
+				constructor(editor: EditorView) {
 					this.decorations = plugin.settings.hideSyntaxMarkers
-						? buildDecorations(view)
+						? buildDecorations(editor)
 						: Decoration.none;
 				}
 

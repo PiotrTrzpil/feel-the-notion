@@ -36,7 +36,7 @@ export class ExplorerAdd {
 	}
 
 	private onHover(evt: MouseEvent): void {
-		const { settings } = this.plugin;
+		const settings = this.plugin.settings;
 		const row = (evt.target as HTMLElement | null)?.closest<HTMLElement>(ROW) ?? null;
 		if (!row || !settings.enabled || !settings.folderNotes || row === this.row) return;
 		const file = this.plugin.app.vault.getAbstractFileByPath(row.dataset.path ?? "");

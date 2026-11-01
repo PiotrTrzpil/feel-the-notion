@@ -22,8 +22,8 @@ export const slashMenuExtension = (plugin: NotionBlock) =>
             private pendingOpen: number | null = null;
             private readonly ownerWindow: Window;
 
-            constructor(view: EditorView) {
-                this.ownerWindow = view.dom.ownerDocument.defaultView ?? activeWindow;
+            constructor(editor: EditorView) {
+                this.ownerWindow = editor.dom.ownerDocument.defaultView ?? activeWindow;
             }
 
             update(update: ViewUpdate): void {

@@ -18,8 +18,8 @@ Notion-like block editing for Obsidian's Live Preview.
 - **Custom insert menu** — insert-menu rows can be reordered, hidden, and extended with custom rows that run any Obsidian command. A custom row runs its command on a single click with no confirmation, so binding a destructive one — "Delete current file", say — gives you a one-click delete.
 - **Bullet depth markers** — optional, off by default: child bullets get their own marker in the file, `-` then `*` then `+`, and a matching ● ○ ▪ on screen. Markers can be reordered or switched off. Only lists you edit are changed. Built in from the standalone [Bullet Depth Markers](https://github.com/MichaelNguyen5653/Bullet-Depth-Markers) plugin; disable that one before turning this on.
 
-- **Folder notes** — a folder with a note of its own name inside (`Travel/Travel.md`) opens that note when clicked, the way a Notion page holds sub-pages; the note is hidden inside the folder, and renaming either renames both. The **Page** insert item creates a sub-page, first turning the current note into a folder note when it is not one. A block dropped on such a folder goes to its note. Same layout as the Folder notes plugin's "inside folder" setting.
-- **Page icons and covers** — an icon and a cover image above the title, as in Notion, read from the `icon` and `banner` / `banner-y` properties that Iconize and Pixel Banner write, so existing notes keep theirs. Hover the title for **Add icon** and **Add cover**; a cover can be changed, repositioned by dragging, or removed. Icons also show in the file explorer. Iconize's folder icons can be imported from settings. Disable Folder notes, Iconize and Pixel Banner when using these.
+- **Folder notes** — a folder with a note of its own name inside (`Travel/Travel.md`) opens that note when clicked, the way a Notion page holds sub-pages; the note is hidden inside the folder, and renaming either renames both. The **Page** insert item creates a sub-page, first turning the current note into a folder note when it is not one. A block dropped on such a folder goes to its note.
+- **Page icons and covers** — an icon and a cover image above the title, as in Notion, stored in the note's `icon` and `banner` / `banner-y` properties, so notes that already have them keep theirs. Hover the title for **Add icon** and **Add cover**; a cover can be changed, repositioned by dragging, or removed. Icons also show in the file explorer, and existing folder icons can be imported from settings.
 
 - **Page header extras** — covers span the pane like Notion's, and can be a built-in gradient or an image uploaded from your computer as well as a vault image or URL. On an empty page, **Templates** fills it from a note in the templates folder (`{{title}}`, `{{date}}`, `{{time}}`, `{{date:FORMAT}}`).
 - **Page options** — **Full width** and **Small text** per page, from the note's menu or the command palette, stored as `cssclasses`.
@@ -52,8 +52,8 @@ New features:
 New features:
 
 - Folder notes, and sub-pages from the "Page" insert item
-- Page icons and covers, compatible with Iconize and Pixel Banner properties
-- Icons in the file explorer, and an import of Iconize's folder icons
+- Page icons and covers, stored as `icon` and `banner` properties
+- Icons in the file explorer, and an import of existing folder icons
 
 ### 0.8.0
 

@@ -74,10 +74,10 @@ export class FolderNotes {
 		if (changed) void this.plugin.saveSettings();
 	}
 
-	private onDelete(file: TAbstractFile): void {
-		if (!(file instanceof TFolder)) return;
+	private onDelete(deleted: TAbstractFile): void {
+		if (!(deleted instanceof TFolder)) return;
 		const icons = this.plugin.settings.folderIcons;
-		const gone = Object.keys(icons).filter((path) => isWithin(path, file.path));
+		const gone = Object.keys(icons).filter((path) => isWithin(path, deleted.path));
 		gone.forEach((path) => delete icons[path]);
 		if (gone.length > 0) void this.plugin.saveSettings();
 	}

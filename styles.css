@@ -262,7 +262,7 @@
     z-index: 9998;
     opacity: 0;
     /* Notion fades its drop line in rather than snapping it; position is
-       never tweened (docs/notion-drag-research.md §5). */
+       never tweened. */
     transition: opacity 150ms ease;
 }
 

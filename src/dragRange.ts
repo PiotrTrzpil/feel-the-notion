@@ -291,7 +291,7 @@ function nearestContent(doc: Text, from: number, step: 1 | -1, skip?: Skip): str
  *
  * FLOOR: a drop must never re-parent the line below it. Dropped shallower than
  * that line, the block would adopt it — and everything nested with it — as its
- * own children. Notion never does this (docs/notion-drag-research.md §3), so
+ * own children. Notion never does this, so
  * the next line's own indent is the shallowest offer.
  *
  * `skip` is the block being dragged, plus the hidden lines of a folded block
@@ -334,7 +334,7 @@ export function allowedIndents(doc: Text, dropLineNo: number, unit: number, skip
  *
  * The drag tints this span. In Notion that tint — not the drop line — is what
  * tells you how deep the block will land, because the lines for every legal
- * depth overlap into one bar (docs/notion-drag-research.md §7).
+ * depth overlap into one bar.
  *
  * The dragged block's own lines are skipped: it is leaving, and can never be
  * its own parent. So are a folded block's hidden lines, which are not there to
@@ -364,7 +364,7 @@ export function pickIndent(allowed: number[], desired: number): number {
  * The deepest legal level whose left edge the pointer has reached.
  *
  * Not the nearest level. Notion switches depth exactly as the pointer crosses
- * a level's edge (measured: docs/notion-drag-research.md §7), so moving right
+ * a level's edge, so moving right
  * commits to a deeper level only once you are visibly over it. Rounding to
  * the nearest switched halfway between edges, which reads as jumpy.
  */
