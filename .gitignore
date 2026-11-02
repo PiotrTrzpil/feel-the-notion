@@ -8,3 +8,6 @@ test/.build/
 *.tmp
 .superpowers/
 docs/superpowers/
+
+# npm only (see CLAUDE.md); a stray pnpm install must not be committed
+pnpm-lock.yaml
