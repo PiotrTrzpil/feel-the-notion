@@ -8,7 +8,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findMarkerRanges } from "./.build/markerRanges.js";
+import { findHeadingMarker, findMarkerRanges, openingMarkerAt } from "./.build/markerRanges.js";
 
 /** Renders what the reader would see if every found range were hidden. */
 function hide(text) {
@@ -45,6 +45,24 @@ test("inline code backticks", () => {
 test("heading hashes and the following space", () => {
 	assert.equal(hide("## Heading"), "Heading");
 	assert.equal(hide("###### Six"), "Six");
+});
+
+test("typing at an opener lands after it, and a closer stays inside the span", () => {
+	assert.deepEqual(openingMarkerAt("**bold**", 0, 0), { from: 0, to: 2 });
+	assert.equal(openingMarkerAt("**bold**", 0, 6), null);
+	assert.deepEqual(openingMarkerAt("see *it* now", 0, 4), { from: 4, to: 5 });
+	assert.equal(openingMarkerAt("see *it* now", 0, 7), null);
+	assert.deepEqual(openingMarkerAt("## Heading", 0, 0), { from: 0, to: 3 });
+	assert.equal(openingMarkerAt("plain", 0, 0), null);
+});
+
+test("a heading marker is the hashes and the space after them", () => {
+	assert.deepEqual(findHeadingMarker("## Heading"), { from: 0, to: 3 });
+	assert.deepEqual(findHeadingMarker("# A", 20), { from: 20, to: 22 });
+	assert.equal(findHeadingMarker("#NoSpace"), null);
+	assert.equal(findHeadingMarker("####### Seven"), null);
+	assert.equal(findHeadingMarker("plain"), null);
+	assert.equal(findHeadingMarker("```"), null);
 });
 
 test("heading plus inline emphasis together", () => {

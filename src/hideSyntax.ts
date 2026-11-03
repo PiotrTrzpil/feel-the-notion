@@ -5,8 +5,9 @@ import {
 	ViewPlugin,
 	ViewUpdate,
 } from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
-import { findMarkerRanges } from "./markerRanges";
+import { Prec, RangeSetBuilder } from "@codemirror/state";
+import { editorLivePreviewField } from "obsidian";
+import { findMarkerRanges, openingMarkerAt } from "./markerRanges";
 import { findFencedLines } from "./codeFence";
 import type NotionBlock from "./main";
 
@@ -34,15 +35,24 @@ import type NotionBlock from "./main";
  * characters — which is what the user is actually looking at.
  *
  * THE TRADE
- * Markers become invisible even while editing, so `**` cannot be clicked
- * between or hand-edited. That is Notion's model — you apply bold with Cmd+B
- * rather than by typing asterisks — but it is a real change in behaviour, so
- * it ships behind a setting and defaults to OFF.
+ * In Live Preview the markers stay hidden on the active line too, so bold,
+ * italics, highlights and headings never turn back into `**` or `###` while
+ * you edit them. They cannot be clicked between there — Cmd+B and Cmd+I apply
+ * them instead. Source mode still shows the characters, unless the setting
+ * hides them there as well.
  */
 
 const hiddenMarker = Decoration.replace({});
 
-function buildDecorations(view: EditorView): DecorationSet {
+function isLivePreview(view: EditorView): boolean {
+	return view.state.field(editorLivePreviewField, false) === true;
+}
+
+function buildDecorations(view: EditorView, hideInSource: boolean): DecorationSet {
+	// Live Preview always hides the markers. Source mode shows them, unless
+	// the setting asks for the same treatment there.
+	if (!hideInSource && !isLivePreview(view)) return Decoration.none;
+
 	const ranges = new RangeSetBuilder<Decoration>();
 	// One document scan per pass rather than one per visible line — findFencedLines
 	// is O(docLines) total, so calling isInsideCodeFence per line here instead
@@ -69,42 +79,66 @@ function buildDecorations(view: EditorView): DecorationSet {
 	return ranges.finish();
 }
 
+/**
+ * A typed character that lands on a hidden opener is inserted after it.
+ *
+ * The marker has no width, so the caret just before `**` or `## ` and the
+ * caret just after it are the same spot. Typing into the first would put the
+ * letter in front of the marker and drop the formatting.
+ */
+function typePastMarker(view: EditorView, from: number, to: number, text: string, hidden: boolean): boolean {
+	if (from !== to || text === "" || !hidden) return false;
+	const line = view.state.doc.lineAt(from);
+	const marker = openingMarkerAt(line.text, line.from, from);
+	if (!marker) return false;
+	view.dispatch({
+		changes: { from: marker.to, insert: text },
+		selection: { anchor: marker.to + text.length },
+		userEvent: "input",
+	});
+	return true;
+}
+
 export function hideSyntaxExtension(plugin: NotionBlock) {
-	const plugins = [
-		ViewPlugin.fromClass(
-			class {
-				decorations: DecorationSet;
+	const pluginClass = ViewPlugin.fromClass(
+		class {
+			decorations: DecorationSet;
 
-				constructor(editor: EditorView) {
-					this.decorations = plugin.settings.hideSyntaxMarkers
-						? buildDecorations(editor)
-						: Decoration.none;
-				}
+			constructor(editor: EditorView) {
+				this.decorations = buildDecorations(editor, plugin.settings.hideSyntaxMarkers);
+			}
 
-				update(update: ViewUpdate) {
-					if (!plugin.settings.hideSyntaxMarkers) {
-						this.decorations = Decoration.none;
-						return;
-					}
-					// Selection changes matter as well as edits: Obsidian adds
-					// and removes its own marker decorations as the caret moves
-					// between lines, so ours have to be rebuilt in step.
-					if (update.docChanged || update.viewportChanged || update.selectionSet) {
-						this.decorations = buildDecorations(update.view);
-					}
+			update(update: ViewUpdate) {
+				const hideInSource = plugin.settings.hideSyntaxMarkers;
+				const live = isLivePreview(update.view);
+				if (!hideInSource && !live) {
+					this.decorations = Decoration.none;
+					return;
 				}
-			},
-			{ decorations: (value) => value.decorations }
+				// Selection changes matter as well as edits: Obsidian adds
+				// and removes its own marker decorations as the caret moves
+				// between lines, so ours have to be rebuilt in step. Toggling
+				// Live Preview changes which markers are hidden without an edit.
+				const enteredPreview = live !== (update.startState.field(editorLivePreviewField, false) === true);
+				if (update.docChanged || update.viewportChanged || update.selectionSet || enteredPreview) {
+					this.decorations = buildDecorations(update.view, hideInSource);
+				}
+			}
+		},
+		{ decorations: (value) => value.decorations }
+	);
+
+	return [
+		// Above Live Preview, which puts `**` and `#` back on the line the caret
+		// is on. This replacement has to stay on top of that.
+		Prec.highest(pluginClass),
+		EditorView.inputHandler.of((view, from, to, text) =>
+			typePastMarker(view, from, to, text, isLivePreview(view) || plugin.settings.hideSyntaxMarkers)
 		),
-
 		// Same ranges again, as atomic. Kept as a separate facet provider
 		// rather than derived from the plugin above so that if the decoration
 		// plugin is ever rebuilt mid-update, the caret cannot briefly land
 		// inside a hidden marker.
-		EditorView.atomicRanges.of((view) =>
-			plugin.settings.hideSyntaxMarkers ? buildDecorations(view) : Decoration.none
-		),
+		EditorView.atomicRanges.of((view) => buildDecorations(view, plugin.settings.hideSyntaxMarkers)),
 	];
-
-	return plugins;
 }

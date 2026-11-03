@@ -111,6 +111,20 @@ function linkLength(text: string, i: number): number {
  * mid-sentence is literal text, and hiding it would delete a visible character
  * from the reader's point of view.
  */
+/**
+ * The `#`s that open an ATX heading, plus the space after them.
+ *
+ * Null when the line is not a heading: a fence, a hash with no space, or
+ * more than six hashes. The space is part of the marker — without it the
+ * heading text would sit against where the hashes were.
+ */
+export function findHeadingMarker(lineText: string, lineFrom = 0): MarkerRange | null {
+	if (FENCE.test(lineText)) return null;
+	const heading = /^(#{1,6})(\s)/.exec(lineText);
+	if (!heading) return null;
+	return { from: lineFrom, to: lineFrom + heading[0].length };
+}
+
 export function findMarkerRanges(lineText: string, lineFrom = 0): MarkerRange[] {
 	if (FENCE.test(lineText)) return [];
 
@@ -118,17 +132,15 @@ export function findMarkerRanges(lineText: string, lineFrom = 0): MarkerRange[] 
 
 	// Leading heading hashes, including the space that follows them. This is
 	// the most valuable case: heading text is large, so the shift is largest.
-	const heading = /^(#{1,6})(\s)/.exec(lineText);
-	if (heading) {
-		ranges.push({ from: lineFrom, to: lineFrom + heading[1].length + heading[2].length });
-	}
+	const heading = findHeadingMarker(lineText, lineFrom);
+	if (heading) ranges.push(heading);
 
 	// Blockquote and list markers are deliberately NOT hidden. They are
 	// structural — Notion shows bullets and quote bars too — and Obsidian
 	// already keeps the quote marker's width via `color: transparent`, so
 	// there is no reflow to fix.
 
-	const start = heading ? heading[0].length : 0;
+	const start = heading ? heading.to - lineFrom : 0;
 	const openers = new Map<string, number>();
 
 	let i = start;
@@ -190,4 +202,26 @@ export function findMarkerRanges(lineText: string, lineFrom = 0): MarkerRange[] 
 	}
 
 	return ranges.sort((a, b) => a.from - b.from);
+}
+
+/**
+ * The hidden marker that starts at `pos`, when that marker opens a span.
+ *
+ * Typing there has to land after the marker. The marker has no width, so the
+ * caret just before it and the caret just after it are the same spot, and a
+ * character inserted before an opener (`**`, `## `) falls outside the span.
+ * A closer is not returned: a character typed there still belongs inside.
+ */
+export function openingMarkerAt(lineText: string, lineFrom: number, pos: number): MarkerRange | null {
+	const ranges = findMarkerRanges(lineText, lineFrom);
+	const hit = ranges.find((range) => range.from === pos);
+	if (!hit) return null;
+	const token = lineText.slice(hit.from - lineFrom, hit.to - lineFrom);
+	let open = false;
+	for (const range of ranges) {
+		if (range.from > hit.from) break;
+		if (lineText.slice(range.from - lineFrom, range.to - lineFrom) !== token) continue;
+		open = !open;
+	}
+	return open ? hit : null;
 }

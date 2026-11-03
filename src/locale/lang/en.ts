@@ -128,6 +128,8 @@ const en = {
     "notice.insertImageFailed": "Failed to insert image.",
     "notice.insertAttachmentFailed": "Failed to insert attachment.",
     "notice.createPageFailed": "Failed to create the page.",
+    "notice.dropNoteFailed": "Could not add the dropped page.",
+    "notice.dropOntoSelf": "A page cannot be dropped onto itself.",
     "notice.noHeadings": "This note has no headings to list.",
     "notice.movedToNote": "Moved to {name}",
     "notice.copiedToNote": "Copied to {name}; this note changed meanwhile, so the original was kept",

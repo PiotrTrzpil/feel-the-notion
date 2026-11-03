@@ -1,7 +1,7 @@
 import { App, TFile, TFolder, getIcon, setIcon } from "obsidian";
 import type NotionBlock from "./main";
-import { folderNotePath } from "./folderNotes";
-import { ICON_KEY, PageIcon, formatIcon, parseIcon } from "./pageMeta";
+import { folderNotePath, folderOfNote } from "./folderNotes";
+import { DEFAULT_FOLDER_ICON, DEFAULT_PAGE_ICON, ICON_KEY, PageIcon, formatIcon, parseIcon } from "./pageMeta";
 import { IconStyle, svgMaskUrl } from "./explorerStyles";
 
 /**
@@ -9,6 +9,8 @@ import { IconStyle, svgMaskUrl } from "./explorerStyles";
  *
  * A note's icon is its `icon` property. A folder's is its folder note's, or,
  * for a folder with no note to hold one, an entry in this plugin's settings.
+ * A page with neither shows the generic page icon. A folder that is not a
+ * page shows the generic directory icon.
  */
 
 export function noteIcon(app: App, file: TFile): PageIcon | null {
@@ -25,6 +27,25 @@ export function folderNote(app: App, folder: TFolder | string): TFile | null {
 export function folderIcon(plugin: NotionBlock, folder: string): PageIcon | null {
 	const note = folderNote(plugin.app, folder);
 	return (note && noteIcon(plugin.app, note)) ?? parseIcon(plugin.settings.folderIcons[folder]);
+}
+
+/** The icon set on a page: its own, or for a folder note, its folder's. Null when none is set. */
+export function storedPageIcon(plugin: NotionBlock, file: TFile): PageIcon | null {
+	const folder = folderOfNote(file.path);
+	if (folder !== null) return folderIcon(plugin, folder);
+	return noteIcon(plugin.app, file);
+}
+
+/** The icon a page shows. A page with none set shows the generic page icon. */
+export function shownPageIcon(plugin: NotionBlock, file: TFile): PageIcon {
+	return storedPageIcon(plugin, file) ?? DEFAULT_PAGE_ICON;
+}
+
+/** The icon a folder shows: its page's, or a directory icon when it is not a page. */
+export function shownFolderIcon(plugin: NotionBlock, folder: string): PageIcon {
+	const note = folderNote(plugin.app, folder);
+	if (note) return shownPageIcon(plugin, note);
+	return folderIcon(plugin, folder) ?? DEFAULT_FOLDER_ICON;
 }
 
 export async function setNoteIcon(app: App, file: TFile, icon: PageIcon | null): Promise<void> {

@@ -60,6 +60,8 @@ export interface BlockPluginSettings {
     insertCustom: CustomInsertItem[];
     /** Write inserted attachments as embeds (a leading "!") rather than links. */
     embedAttachments: boolean;
+    /** A link to an attachment is one block, not editable text. */
+    attachmentLinks: boolean;
     /** Rewrite bullet markers in the file to follow nesting depth. */
     bulletDepth: boolean;
     /** The three legal markers in the order the user chose. Empty means - * +. */
@@ -68,6 +70,8 @@ export interface BlockPluginSettings {
     bulletHidden: string[];
     /** Folders open their note on click; the note is hidden inside them. */
     folderNotes: boolean;
+    /** A link to a sub-page or a nested page is one block, not editable text. */
+    pageLinkBlocks: boolean;
     /** Icon and cover above a note's title, and icons in the file explorer. */
     pageHeader: boolean;
     /** Icons of folders that have no folder note to hold one, by folder path. */
@@ -122,6 +126,9 @@ export const DEFAULT_SETTINGS: BlockPluginSettings = {
     // OFF by default, as asked: an attachment reads as a link unless it is
     // explicitly meant to render inline.
     embedAttachments: false,
+    // ON by default: an attachment link is one block, the same way a sub-page
+    // link is. The letters of the link are not something you edit.
+    attachmentLinks: true,
     // OFF by default: it writes to the user's notes, changing characters they
     // typed, which nothing else in the plugin does without being asked.
     bulletDepth: false,
@@ -133,6 +140,9 @@ export const DEFAULT_SETTINGS: BlockPluginSettings = {
     // note, an `icon` or `banner` field), apart from the "Add icon" and "Add
     // cover" buttons that appear while hovering a note's title.
     folderNotes: true,
+    // ON by default: a sub-page link is a page block in Notion, and the
+    // letters of the link are not something you edit.
+    pageLinkBlocks: true,
     pageHeader: true,
     folderIcons: {},
     templatesFolder: 'Templates',
@@ -236,11 +246,12 @@ export class BlockPluginSettingTab extends PluginSettingTab {
                 .onChange((value) => this.store('timeFormat', value)));
 
         new Setting(containerEl)
-            .setName('Hide syntax markers')
+            .setName('Hide syntax in source mode')
             .setDesc(
-                'Keep **, _, ==, ` and heading #s hidden even on the line you are editing, '
-                + 'so text stops shifting sideways as the caret enters a formatted span. '
-                + 'Trade-off: markers cannot be clicked between or hand-edited \u2014 use Cmd+B / Cmd+I instead.'
+                'Live Preview always keeps **, _, ==, ` and heading #s hidden while you edit, '
+                + 'so formatting does not turn back into syntax. '
+                + 'On: source mode hides them too. Off: source mode shows the characters. '
+                + 'In Live Preview they cannot be clicked between — use Cmd+B / Cmd+I.'
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.hideSyntaxMarkers)
@@ -341,6 +352,17 @@ export class BlockPluginSettingTab extends PluginSettingTab {
                 .onChange((value) => this.store('embedAttachments', value)));
 
         new Setting(containerEl)
+            .setName('Attachment links are blocks')
+            .setDesc(
+                'A link to an attachment is drawn as a single block: a paperclip and the file name. '
+                + 'The caret cannot sit inside the link, and Backspace beside it removes the whole link. '
+                + 'Embeds are left alone, so an image still shows as an image.'
+            )
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.attachmentLinks)
+                .onChange((value) => this.store('attachmentLinks', value)));
+
+        new Setting(containerEl)
             .setName(t('settings.insertItems.name'))
             .setDesc(t('settings.insertItems.desc'))
             .setHeading();
@@ -356,17 +378,33 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .setDesc(
                 'A folder whose note sits inside it under the same name (Travel/Travel.md) opens that '
                 + 'note when clicked, and the note is hidden from the folder\'s contents. Renaming one '
-                + 'renames the other. The "Page" insert item makes the new page a sub-page.'
+                + 'renames the other. The file explorer lists that folder\'s pages in the order the note '
+                + 'links them, and pages it never links by name. The "Page" insert item makes the new page '
+                + 'a sub-page. Dropping a markdown file on a note copies it into that folder and links it '
+                + 'where it was dropped.'
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.folderNotes)
                 .onChange((value) => this.store('folderNotes', value)));
 
         new Setting(containerEl)
+            .setName('Sub-page links are blocks')
+            .setDesc(
+                'A link to a sub-page, or to a page nested under one, is drawn as a single block: '
+                + 'its icon and its title. The caret cannot sit inside the link, and Backspace beside '
+                + 'it removes the whole link. The link text stays in the note.'
+            )
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.pageLinkBlocks)
+                .onChange((value) => this.store('pageLinkBlocks', value)));
+
+        new Setting(containerEl)
             .setName('Page icons and covers')
             .setDesc(
                 'An icon and a cover image above the title, read from the "icon" and "banner" '
-                + 'properties, as Iconize and Pixel Banner wrote them. Icons also show in the file explorer.'
+                + 'properties, as Iconize and Pixel Banner wrote them. A page with no icon shows a generic page icon, '
+                + 'and a folder that is not a page shows a directory icon. '
+                + 'Icons also show in the file explorer.'
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.pageHeader)

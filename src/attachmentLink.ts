@@ -20,6 +20,18 @@ export function encodeLinkPath(path: string): string {
 	return encodeURI(path).replace(/\(/g, "%28").replace(/\)/g, "%29");
 }
 
+/**
+ * A saved file that is not a markdown note: a PDF, an image, or anything else
+ * inserted as an attachment. Notes stay ordinary links, or page blocks when
+ * they are sub-pages.
+ */
+export function isAttachmentPath(path: string): boolean {
+	const name = path.slice(path.lastIndexOf("/") + 1);
+	const dot = name.lastIndexOf(".");
+	if (dot <= 0) return false;
+	return name.slice(dot + 1).toLowerCase() !== "md";
+}
+
 /** The file name without its directory or extension. */
 export function linkDisplayName(path: string): string {
 	const name = path.split("/").pop() ?? path;

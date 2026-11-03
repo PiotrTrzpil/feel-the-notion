@@ -1,17 +1,19 @@
-import { MarkdownView, Notice, TFile, debounce, setIcon } from "obsidian";
+import { MarkdownView, Notice, TFile, TFolder, debounce, setIcon } from "obsidian";
 import type NotionBlock from "./main";
+import { folderOfNote } from "./folderNotes";
 import {
 	COVER_GRADIENTS,
 	COVER_KEY,
 	COVER_Y_KEY,
 	Cover,
+	DEFAULT_PAGE_ICON,
 	PageIcon,
 	clampPercent,
 	formatCoverLink,
 	formatGradientCover,
 	parseCover,
 } from "./pageMeta";
-import { noteIcon, renderIcon, setNoteIcon } from "./pageIcons";
+import { renderIcon, setFolderIcon, setNoteIcon, storedPageIcon } from "./pageIcons";
 import { CoverPick, CoverPickerModal, IconPickerModal } from "./pagePickers";
 import { saveAttachment } from "./blockTransform";
 import { hasTemplates, isEmptyPageCached, pickTemplate } from "./templates";
@@ -22,9 +24,9 @@ const HEADER_CLASS = "ftn-page-header";
 type CoverPaint = { kind: "image"; url: string } | { kind: "gradient"; css: string };
 
 /**
- * Notion's page header: a cover and an icon above the note's title, with
- * "Add icon", "Add cover" and, on an empty page, "Templates" while the title
- * is hovered.
+ * Notion's page header: a cover and an icon above the note's title. A page
+ * with no icon of its own shows a generic page icon; clicking it sets one.
+ * "Add cover" and, on an empty page, "Templates" show while the title is hovered.
  *
  * Drawn before each `.inline-title`, in Live Preview and in Reading view
  * alike, so it scrolls with the note and sits where Notion puts it. Without
@@ -85,22 +87,22 @@ export class PageHeaders {
 	private render(view: MarkdownView): void {
 		const file = view.file;
 		const { settings, app } = this.plugin;
-		const show = file !== null && settings.enabled && settings.pageHeader;
-		const icon = show ? noteIcon(app, file) : null;
-		const cover = show ? parseCover(app.metadataCache.getFileCache(file)?.frontmatter) : null;
-		const paint = cover && file ? this.coverPaint(cover, file) : null;
-		const offerTemplates = show && isEmptyPageCached(app, file) && hasTemplates(this.plugin);
-		const key = JSON.stringify([file?.path, icon, paint, cover?.y, offerTemplates]);
+		const titles = view.containerEl.querySelectorAll<HTMLElement>(".inline-title");
+		if (file === null || !settings.enabled || !settings.pageHeader) {
+			titles.forEach((title) => headerBefore(title)?.remove());
+			return;
+		}
 
-		view.containerEl.querySelectorAll<HTMLElement>(".inline-title").forEach((title) => {
-			const existing = title.previousElementSibling;
-			const current = existing instanceof HTMLElement && existing.hasClass(HEADER_CLASS) ? existing : null;
-			if (!show || !file) {
-				current?.remove();
-				return;
-			}
+		const stored = storedPageIcon(this.plugin, file);
+		const cover = parseCover(app.metadataCache.getFileCache(file)?.frontmatter);
+		const paint = cover ? this.coverPaint(cover, file) : null;
+		const offerTemplates = isEmptyPageCached(app, file) && hasTemplates(this.plugin);
+		const key = JSON.stringify([file.path, stored, paint, cover?.y, offerTemplates]);
+
+		titles.forEach((title) => {
+			const current = headerBefore(title);
 			if (current?.dataset.key === key) return;
-			const header = this.build(file, icon, cover, paint, offerTemplates);
+			const header = this.build(file, stored, cover, paint, offerTemplates);
 			header.dataset.key = key;
 			if (current) current.replaceWith(header);
 			else title.before(header);
@@ -126,27 +128,27 @@ export class PageHeaders {
 
 	private build(
 		file: TFile,
-		icon: PageIcon | null,
+		stored: PageIcon | null,
 		cover: Cover | null,
 		paint: CoverPaint | null,
 		offerTemplates: boolean
 	): HTMLElement {
 		const header = createDiv({ cls: HEADER_CLASS });
+		header.addClass("has-icon");
 		header.toggleClass("has-cover", paint !== null);
-		header.toggleClass("has-icon", icon !== null);
 		// Keeps the editor from taking a click on the header as one on the text.
 		header.addEventListener("mousedown", (evt) => evt.stopPropagation());
 
 		if (cover && paint) this.buildCover(header, file, cover, paint);
 
-		if (icon) {
-			const iconEl = header.createDiv({ cls: "ftn-page-icon", attr: { "aria-label": "Change icon" } });
-			renderIcon(iconEl, icon);
-			iconEl.addEventListener("click", () => this.pickIcon(file, true));
-		}
+		const iconEl = header.createDiv({
+			cls: "ftn-page-icon",
+			attr: { "aria-label": stored ? "Change icon" : "Add icon" },
+		});
+		renderIcon(iconEl, stored ?? DEFAULT_PAGE_ICON);
+		iconEl.addEventListener("click", () => this.pickIcon(file, stored !== null));
 
 		const actions = header.createDiv({ cls: "ftn-page-header-actions" });
-		if (!icon) this.button(actions, "smile-plus", "Add icon", () => this.pickIcon(file, false));
 		if (!paint) this.button(actions, "image-plus", "Add cover", () => this.pickCover(file, cover !== null));
 		if (offerTemplates) this.button(actions, "layout-template", "Templates", () => pickTemplate(this.plugin, file));
 		return header;
@@ -205,7 +207,13 @@ export class PageHeaders {
 	}
 
 	private pickIcon(file: TFile, hasIcon: boolean): void {
-		new IconPickerModal(this.plugin.app, hasIcon, (icon) => void setNoteIcon(this.plugin.app, file, icon)).open();
+		const folderPath = folderOfNote(file.path);
+		const folder = folderPath === null ? null : this.plugin.app.vault.getAbstractFileByPath(folderPath);
+		const apply = (icon: PageIcon | null) =>
+			folder instanceof TFolder
+				? setFolderIcon(this.plugin, folder, icon)
+				: setNoteIcon(this.plugin.app, file, icon);
+		new IconPickerModal(this.plugin.app, hasIcon, (icon) => void apply(icon)).open();
 	}
 
 	private pickCover(file: TFile, hasCover: boolean): void {
@@ -266,6 +274,12 @@ export class PageHeaders {
 
 function scrollerOf(header: HTMLElement): HTMLElement | null {
 	return header.closest<HTMLElement>(".cm-scroller, .markdown-preview-view");
+}
+
+/** The header drawn just before a title, when this plugin put it there. */
+function headerBefore(title: HTMLElement): HTMLElement | null {
+	const existing = title.previousElementSibling;
+	return existing instanceof HTMLElement && existing.hasClass(HEADER_CLASS) ? existing : null;
 }
 
 /**

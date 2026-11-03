@@ -130,6 +130,8 @@ const zhTw: LocaleType = {
     "notice.insertImageFailed": "插入圖片失敗。",
     "notice.insertAttachmentFailed": "插入附件失敗。",
     "notice.createPageFailed": "建立頁面失敗。",
+    "notice.dropNoteFailed": "無法加入拖放的頁面。",
+    "notice.dropOntoSelf": "頁面無法拖放到自身上。",
     "notice.noHeadings": "此筆記沒有可列出的標題。",
     "notice.movedToNote": "已移動到 {name}",
     "notice.copiedToNote": "已複製到 {name}；此筆記在此期間已變更，因此保留了原內容",

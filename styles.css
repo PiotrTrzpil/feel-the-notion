@@ -570,8 +570,10 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
 }
 
 /* ---- Pages: explorer icons ---------------------------------------------
- * What each icon draws comes from the generated #ftn-explorer-decor sheet;
- * these only space it. A ::before without `content` does not exist, so rows
+ * What each icon draws comes from the generated #ftn-explorer-decor sheet,
+ * including the generic page icon on a page that has none of its own and a
+ * directory icon on a folder that is not a page.
+ * These only space it. A ::before without `content` does not exist, so rows
  * with no icon are untouched. */
 
 .workspace-leaf-content[data-type="file-explorer"] .nav-file-title-content::before,
@@ -580,6 +582,17 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
     min-width: 1em;
     margin-inline-end: 0.35em;
     text-align: center;
+    vertical-align: baseline;
+}
+
+/* Hover bolds the row in some themes. A heavier weight reflows the name by a
+ * pixel or two; keep the weight the row already has, including the open file. */
+.workspace-leaf-content[data-type="file-explorer"] .tree-item-self.is-clickable:hover {
+    font-weight: var(--nav-item-weight);
+}
+
+.workspace-leaf-content[data-type="file-explorer"] .tree-item-self.is-active.is-clickable:hover {
+    font-weight: var(--nav-item-weight-active);
 }
 
 /* ---- Pages: header above the title ------------------------------------ */
@@ -800,21 +813,39 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
 
 /* ---- Pages: "+" in the explorer ---------------------------------------- */
 
-.ftn-explorer-add {
+/* Out of the row's flex line. That line is aligned on the text baseline, so a
+ * button joining it on hover shifts the name by a pixel or two. The row is
+ * already position: relative. The background matches the row, so a long name
+ * does not show through the glyph. */
+.workspace-leaf-content[data-type="file-explorer"] .ftn-explorer-add {
     display: none;
-    margin-inline-start: auto;
-    padding: 0 2px;
+    position: absolute;
+    z-index: 1;
+    inset-inline-end: var(--size-2-1);
+    top: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0 var(--size-2-1);
+    height: auto;
+    align-items: center;
+    justify-content: center;
+    background-color: inherit;
     color: var(--icon-color);
 }
 
-.ftn-explorer-add svg {
+.workspace-leaf-content[data-type="file-explorer"] .ftn-explorer-add svg {
     width: 14px;
     height: 14px;
 }
 
-.nav-folder-title:hover > .ftn-explorer-add,
-.nav-file-title:hover > .ftn-explorer-add {
+.workspace-leaf-content[data-type="file-explorer"] .nav-folder-title:hover > .ftn-explorer-add,
+.workspace-leaf-content[data-type="file-explorer"] .nav-file-title:hover > .ftn-explorer-add {
     display: flex;
+}
+
+.workspace-leaf-content[data-type="file-explorer"] .ftn-explorer-add:hover {
+    background-color: inherit;
+    color: var(--icon-color-hover);
 }
 
 /* ---- Pages: sub-pages block -------------------------------------------- */
@@ -865,6 +896,76 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
 .ftn-subpages-empty {
     color: var(--text-faint);
     font-size: var(--font-ui-small);
+}
+
+/* A link to a sub-page or a nested page: one block, not editable letters.
+   Inline, never a block box: a block-level widget inside a line breaks that
+   line into two or three rows (the widget, plus the buffers CodeMirror puts
+   on either side of it). */
+.cm-widget.ftn-page-link,
+.ftn-page-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    max-width: 100%;
+    padding: 0 0.3em;
+    border-radius: var(--radius-s);
+    color: var(--text-normal);
+    line-height: inherit;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    vertical-align: middle;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.cm-widget.ftn-page-link.is-block,
+.ftn-page-link.is-block {
+    display: inline-flex;
+    width: auto;
+    margin: 0;
+    /* Hover fill lives on the link. No padding on the left, so the icon
+       lines up with the text on the lines above and below. */
+    padding: 0.28em 0.5em 0.28em 0;
+}
+
+/* A little gap between rows, outside the hover. Still one row. */
+.cm-line:has(> .ftn-page-link.is-block) {
+    padding-top: 0.12em;
+    padding-bottom: 0.12em;
+    caret-color: transparent;
+}
+
+a.internal-link.ftn-page-link,
+a.internal-link.ftn-page-link:hover {
+    text-decoration: none;
+    background-image: none;
+    color: var(--text-normal);
+}
+
+.ftn-page-link:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ftn-page-link-icon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.15em;
+    height: 1.15em;
+}
+
+.ftn-page-link-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+.ftn-page-link-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ---- Toggle: a folded callout without the callout's box ----------------- */

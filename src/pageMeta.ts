@@ -16,6 +16,12 @@ export const COVER_Y_KEY = "banner-y";
 /** An emoji or other text, or a Lucide icon id (`book-open`, no prefix). */
 export type PageIcon = { kind: "text"; text: string } | { kind: "lucide"; id: string };
 
+/** What a page shows when it has no icon of its own. Lucide's document icon. */
+export const DEFAULT_PAGE_ICON: PageIcon = { kind: "lucide", id: "file-text" };
+
+/** What a folder shows when it is not a page and has no icon of its own. */
+export const DEFAULT_FOLDER_ICON: PageIcon = { kind: "lucide", id: "folder" };
+
 const LUCIDE_PREFIX = "lucide-";
 /** Iconize's own spelling of a Lucide icon: `Li` then the PascalCase name. */
 const ICONIZE_LUCIDE = /^Li([A-Z][A-Za-z0-9]*)$/;

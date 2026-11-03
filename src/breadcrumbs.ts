@@ -1,7 +1,7 @@
 import { Keymap, MarkdownView, TFile, WorkspaceLeaf, debounce } from "obsidian";
 import type NotionBlock from "./main";
 import { folderOfNote, joinPath } from "./folderNotes";
-import { folderIcon, folderNote, renderIcon } from "./pageIcons";
+import { folderNote, renderIcon, shownFolderIcon } from "./pageIcons";
 
 const CRUMB = ".view-header-title-parent > .view-header-breadcrumb";
 
@@ -79,10 +79,11 @@ export class Breadcrumbs {
 				crumb.addClass("ftn-crumb-self");
 				return;
 			}
-			if (!folderNote(this.plugin.app, folder)) return;
-			crumb.addClass("ftn-crumb-page");
-			const icon = this.plugin.settings.pageHeader ? folderIcon(this.plugin, folder) : null;
-			if (icon) renderIcon(crumb.createSpan({ cls: "ftn-crumb-icon", prepend: true }), icon);
+			const note = folderNote(this.plugin.app, folder);
+			if (note) crumb.addClass("ftn-crumb-page");
+			if (this.plugin.settings.pageHeader) {
+				renderIcon(crumb.createSpan({ cls: "ftn-crumb-icon", prepend: true }), shownFolderIcon(this.plugin, folder));
+			}
 		});
 	}
 }

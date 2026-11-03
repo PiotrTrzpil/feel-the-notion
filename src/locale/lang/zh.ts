@@ -130,6 +130,8 @@ const zh: LocaleType = {
     "notice.insertImageFailed": "插入图片失败。",
     "notice.insertAttachmentFailed": "插入附件失败。",
     "notice.createPageFailed": "创建页面失败。",
+    "notice.dropNoteFailed": "无法添加拖放的页面。",
+    "notice.dropOntoSelf": "页面不能拖放到自身上。",
     "notice.noHeadings": "此笔记没有可列出的标题。",
     "notice.movedToNote": "已移动到 {name}",
     "notice.copiedToNote": "已复制到 {name}；此笔记在此期间已更改，因此保留了原内容",

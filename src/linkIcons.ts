@@ -4,14 +4,15 @@ import { syntaxTree } from "@codemirror/language";
 import { MarkdownView, TFile, WorkspaceLeaf, debounce, editorInfoField } from "obsidian";
 import type NotionBlock from "./main";
 import { findLinks } from "./fileDrop";
+import { isNestedPage } from "./pageLink";
 import { PageIcon, formatIcon } from "./pageMeta";
-import { folderIcon, noteIcon, renderIcon } from "./pageIcons";
-import { folderOfNote } from "./folderNotes";
+import { noteIcon, renderIcon, shownPageIcon } from "./pageIcons";
 
 /**
  * Page icons beside links to pages, as Notion shows a page's icon wherever
  * the page is mentioned: before `[[links]]` and `[text](note.md)` links in
- * Live Preview and Reading view, and before the title on each tab.
+ * Live Preview and Reading view, and before the title on each tab. A page
+ * with no icon of its own shows the generic page icon.
  *
  * Embeds are left alone (an embedded note shows its own header), as are
  * links inside code.
@@ -40,14 +41,6 @@ class LinkIconWidget extends WidgetType {
 	}
 }
 
-/** The icon a page shows wherever it is linked: its own, or for a folder note, its folder's. */
-function pageIconOf(plugin: NotionBlock, file: TFile): PageIcon | null {
-	const own = noteIcon(plugin.app, file);
-	if (own) return own;
-	const folder = folderOfNote(file.path);
-	return folder === null ? null : folderIcon(plugin, folder);
-}
-
 function isInCode(view: EditorView, pos: number): boolean {
 	const name = syntaxTree(view.state).resolveInner(pos, 1).name;
 	return /code|math/i.test(name);
@@ -68,8 +61,9 @@ function buildDecorations(plugin: NotionBlock, view: EditorView): DecorationSet 
 			if (isInCode(view, pos)) continue;
 			const target = app.metadataCache.getFirstLinkpathDest(link.path, sourcePath);
 			if (!target || target.extension !== "md") continue;
-			const icon = pageIconOf(plugin, target);
-			if (!icon) continue;
+			// A sub-page link is drawn as its own block, icon included.
+			if (settings.folderNotes && settings.pageLinkBlocks && isNestedPage(sourcePath, target.path)) continue;
+			const icon = shownPageIcon(plugin, target);
 			ranges.add(pos, pos, Decoration.widget({ widget: new LinkIconWidget(icon), side: -1 }));
 		}
 	}
@@ -150,8 +144,10 @@ export class LinkIcons {
 		el.querySelectorAll<HTMLAnchorElement>("a.internal-link").forEach((a) => {
 			if (a.querySelector(".ftn-link-icon")) return;
 			const target = app.metadataCache.getFirstLinkpathDest(a.dataset.href ?? a.getAttr("href") ?? "", sourcePath);
-			const icon = target && target.extension === "md" ? pageIconOf(this.plugin, target) : null;
-			if (icon) renderIcon(a.createSpan({ cls: "ftn-link-icon", prepend: true }), icon);
+			if (!target || target.extension !== "md") return;
+			// A sub-page link is drawn as its own block, icon included.
+			if (settings.folderNotes && settings.pageLinkBlocks && isNestedPage(sourcePath, target.path)) return;
+			renderIcon(a.createSpan({ cls: "ftn-link-icon", prepend: true }), shownPageIcon(this.plugin, target));
 		});
 	}
 
@@ -162,7 +158,7 @@ export class LinkIcons {
 			if (!titleEl?.parentElement) return;
 			const existing = titleEl.parentElement.querySelector<HTMLElement>(":scope > .ftn-tab-icon");
 			const file = leaf.view instanceof MarkdownView ? leaf.view.file : null;
-			const icon = file && settings.enabled && settings.pageHeader ? pageIconOf(this.plugin, file) : null;
+			const icon = file && settings.enabled && settings.pageHeader ? shownPageIcon(this.plugin, file) : null;
 			const key = icon ? formatIcon(icon) : null;
 			if ((existing?.dataset.icon ?? null) === key) return;
 			existing?.remove();

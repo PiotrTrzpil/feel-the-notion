@@ -281,7 +281,7 @@ function insertTextAtLineEnd(
 
 }
 
-function isImageFile(file: File): boolean {
+export function isImageFile(file: File): boolean {
     const ext = getFileExtension(file.name);
     return IMAGE_EXTENSIONS.has(ext);
 }

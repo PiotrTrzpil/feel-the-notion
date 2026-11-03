@@ -5,7 +5,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clampPercent, containsEmoji, formatIcon, parseCover, parseIcon, withCssClass } from "./.build/pageMeta.js";
+import { DEFAULT_FOLDER_ICON, DEFAULT_PAGE_ICON, clampPercent, containsEmoji, formatIcon, parseCover, parseIcon, withCssClass } from "./.build/pageMeta.js";
 
 test("an emoji icon is text", () => {
 	assert.deepEqual(parseIcon("🇵🇹"), { kind: "text", text: "🇵🇹" });
@@ -23,6 +23,17 @@ test("Lucide icons read in both our spelling and Iconize's", () => {
 	assert.deepEqual(parseIcon("LiOrigami"), { kind: "lucide", id: "origami" });
 	assert.deepEqual(parseIcon("LiArrowUpRight"), { kind: "lucide", id: "arrow-up-right" });
 	assert.deepEqual(parseIcon("LiBuilding2"), { kind: "lucide", id: "building-2" });
+});
+
+test("a page with no icon shows the generic page icon", () => {
+	assert.deepEqual(DEFAULT_PAGE_ICON, { kind: "lucide", id: "file-text" });
+	assert.equal(formatIcon(DEFAULT_PAGE_ICON), "lucide-file-text");
+	assert.deepEqual(parseIcon(formatIcon(DEFAULT_PAGE_ICON)), DEFAULT_PAGE_ICON);
+});
+
+test("a folder that is not a page shows the generic directory icon", () => {
+	assert.deepEqual(DEFAULT_FOLDER_ICON, { kind: "lucide", id: "folder" });
+	assert.equal(formatIcon(DEFAULT_FOLDER_ICON), "lucide-folder");
 });
 
 test("an icon written back reads the same", () => {

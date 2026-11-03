@@ -1,7 +1,7 @@
 import { App, Keymap, Notice, SearchResult, SuggestModal, TFile, prepareFuzzySearch, renderResults, setIcon } from "obsidian";
 import type NotionBlock from "./main";
 import { folderOfNote, parentPath } from "./folderNotes";
-import { folderIcon, noteIcon, renderIcon } from "./pageIcons";
+import { renderIcon, shownPageIcon } from "./pageIcons";
 import { PageIcon } from "./pageMeta";
 
 /**
@@ -15,7 +15,7 @@ import { PageIcon } from "./pageMeta";
  */
 
 type Choice =
-	| { kind: "page"; file: TFile; icon: PageIcon | null; match: SearchResult | null }
+	| { kind: "page"; file: TFile; icon: PageIcon; match: SearchResult | null }
 	| { kind: "create"; name: string };
 
 const RECENT_LIMIT = 30;
@@ -37,12 +37,6 @@ class PageSwitcherModal extends SuggestModal<Choice> {
 		});
 	}
 
-	private iconOf(file: TFile): PageIcon | null {
-		const own = noteIcon(this.app, file);
-		const folder = folderOfNote(file.path);
-		return own ?? (folder === null ? null : folderIcon(this.plugin, folder));
-	}
-
 	getSuggestions(query: string): Choice[] {
 		const q = query.trim();
 		const files = this.app.vault.getMarkdownFiles();
@@ -53,7 +47,7 @@ class PageSwitcherModal extends SuggestModal<Choice> {
 				.map((path) => this.app.vault.getAbstractFileByPath(path))
 				.filter((f): f is TFile => f instanceof TFile && f.extension === "md")
 				.slice(0, RECENT_LIMIT);
-			return recent.map((file) => ({ kind: "page", file, icon: this.iconOf(file), match: null }));
+			return recent.map((file) => ({ kind: "page", file, icon: shownPageIcon(this.plugin, file), match: null }));
 		}
 
 		const search = prepareFuzzySearch(q);
@@ -64,7 +58,12 @@ class PageSwitcherModal extends SuggestModal<Choice> {
 		}
 		scored.sort((a, b) => b.match.score - a.match.score || a.file.path.length - b.file.path.length);
 
-		const choices: Choice[] = scored.map(({ file, match }) => ({ kind: "page", file, icon: this.iconOf(file), match }));
+		const choices: Choice[] = scored.map(({ file, match }) => ({
+			kind: "page",
+			file,
+			icon: shownPageIcon(this.plugin, file),
+			match,
+		}));
 		const exact = scored.some(({ file }) => file.basename.toLowerCase() === q.toLowerCase());
 		if (!exact) choices.push({ kind: "create", name: q });
 		return choices;
@@ -78,8 +77,7 @@ class PageSwitcherModal extends SuggestModal<Choice> {
 			el.createSpan({ text: `New page "${choice.name}"` });
 			return;
 		}
-		if (choice.icon) renderIcon(iconEl, choice.icon);
-		else setIcon(iconEl, folderOfNote(choice.file.path) === null ? "file-text" : "folder");
+		renderIcon(iconEl, choice.icon);
 
 		const text = el.createDiv({ cls: "ftn-switcher-text" });
 		const title = text.createDiv({ cls: "ftn-switcher-title" });

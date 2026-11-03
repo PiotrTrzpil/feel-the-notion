@@ -21,6 +21,16 @@ export interface ExplorerDecor {
 	fileIcons: ReadonlyMap<string, IconStyle>;
 	folderIcons: ReadonlyMap<string, IconStyle>;
 	/**
+	 * Drawn on every markdown file and every folder in `pageFolders` that has
+	 * no icon of its own. Emitted before the per-path icons, which replace it.
+	 */
+	defaultPageIcon: IconStyle | null;
+	/**
+	 * Drawn on every folder. Less specific than a per-path icon, so a page
+	 * folder's icon and any chosen folder icon replace it.
+	 */
+	defaultFolderIcon: IconStyle | null;
+	/**
 	 * The folder whose note is open. Its own row is hidden, so Obsidian's
 	 * active-file highlight has nowhere to show; the folder takes it instead.
 	 */
@@ -63,14 +73,34 @@ export function buildExplorerCss(decor: ExplorerDecor): string {
 		);
 	}
 
-	for (const [path, icon] of decor.fileIcons) {
-		rules.push(iconRule(`${EXPLORER} .nav-file-title[data-path=${cssString(path)}] .nav-file-title-content::before`, icon));
+	// Directory icon on every folder, then the page icon. A per-path rule is
+	// more specific, so a chosen icon or a folder note's page icon replaces these.
+	if (decor.defaultFolderIcon) rules.push(iconRule(ANY_FOLDER_ICON, decor.defaultFolderIcon));
+	if (decor.defaultPageIcon) {
+		rules.push(iconRule(ANY_MARKDOWN_ICON, decor.defaultPageIcon));
+		if (decor.pageFolders.length > 0) {
+			rules.push(iconRule(decor.pageFolders.map(folderIconBefore).join(",\n"), decor.defaultPageIcon));
+		}
 	}
-	for (const [path, icon] of decor.folderIcons) {
-		rules.push(iconRule(`${EXPLORER} .nav-folder-title[data-path=${cssString(path)}] .nav-folder-title-content::before`, icon));
-	}
+	pushIcons(rules, decor.fileIcons, fileIconBefore);
+	pushIcons(rules, decor.folderIcons, folderIconBefore);
 
 	return rules.join("\n");
+}
+
+const ANY_FOLDER_ICON = `${EXPLORER} .nav-folder-title .nav-folder-title-content::before`;
+const ANY_MARKDOWN_ICON = `${EXPLORER} .nav-file-title[data-path$=".md"] .nav-file-title-content::before`;
+
+function fileIconBefore(path: string): string {
+	return `${EXPLORER} .nav-file-title[data-path=${cssString(path)}] .nav-file-title-content::before`;
+}
+
+function folderIconBefore(path: string): string {
+	return `${EXPLORER} .nav-folder-title[data-path=${cssString(path)}] .nav-folder-title-content::before`;
+}
+
+function pushIcons(rules: string[], icons: ReadonlyMap<string, IconStyle>, selector: (path: string) => string): void {
+	for (const [path, icon] of icons) rules.push(iconRule(selector(path), icon));
 }
 
 /**
@@ -79,9 +109,15 @@ export function buildExplorerCss(decor: ExplorerDecor): string {
  * no `content` does not exist.
  */
 function iconRule(selector: string, icon: IconStyle): string {
+	// Text clears the mask a generic icon may already have set: both rules share
+	// a specificity, and the later one only wins properties it sets.
+	// The mask sits a touch below the baseline via transform, which paints
+	// without changing the line box. vertical-align would, and the row would
+	// jump by a pixel when anything else on the line changed.
 	return icon.kind === "text"
-		? `${selector} { content: ${cssString(icon.text)}; }`
-		: `${selector} { content: ""; width: 1em; height: 1em; vertical-align: -0.15em; `
+		? `${selector} { content: ${cssString(icon.text)}; width: auto; height: auto; line-height: inherit; vertical-align: baseline; transform: none; `
+			+ `-webkit-mask: none; mask: none; background-color: transparent; }`
+		: `${selector} { content: ""; width: 1em; height: 1em; line-height: 1; vertical-align: baseline; transform: translateY(0.15em); `
 			+ `-webkit-mask: ${icon.url} center / contain no-repeat; mask: ${icon.url} center / contain no-repeat; `
 			+ `background-color: currentColor; }`;
 }

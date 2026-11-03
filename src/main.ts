@@ -15,10 +15,12 @@ import { bulletDepthExtension, resolveBulletMarkers } from './bulletDepth';
 import { RELEASE_NOTES, shouldShowWhatsNew } from './whatsNew';
 import { WhatsNewModal } from './whatsNewModal';
 import { ExplorerDecor } from './explorerDecor';
+import { ExplorerSort } from './explorerSort';
 import { FolderNotes } from './folderNoteView';
 import { PageHeaders } from './pageHeader';
 import { importIconizeIcons } from './iconizeImport';
 import { LinkIcons } from './linkIcons';
+import { PageLinks } from './pageLinkView';
 import { Breadcrumbs } from './breadcrumbs';
 import { ExplorerAdd } from './explorerAdd';
 import { registerPageOptions } from './pageOptions';
@@ -27,12 +29,15 @@ import { registerSubpages } from './subpages';
 import { pickTemplate } from './templates';
 import { registerMentionSuggest } from './mentionSuggest';
 import { registerLinkPaste } from './linkPaste';
+import { registerNoteDrop } from './noteDropView';
 
 export default class NotionBlock extends Plugin {
     settings: BlockPluginSettings;
     private explorerDecor: ExplorerDecor | null = null;
+    private explorerSort: ExplorerSort | null = null;
     private pageHeaders: PageHeaders | null = null;
     private linkIcons: LinkIcons | null = null;
+    private pageLinks: PageLinks | null = null;
     private breadcrumbs: Breadcrumbs | null = null;
 
     async onload() {
@@ -58,8 +63,10 @@ export default class NotionBlock extends Plugin {
         // takes effect without a reload.
         new FolderNotes(this);
         this.explorerDecor = new ExplorerDecor(this);
+        this.explorerSort = new ExplorerSort(this);
         this.pageHeaders = new PageHeaders(this);
         this.linkIcons = new LinkIcons(this);
+        this.pageLinks = new PageLinks(this);
         this.breadcrumbs = new Breadcrumbs(this);
         new ExplorerAdd(this);
         registerPageOptions(this);
@@ -67,6 +74,7 @@ export default class NotionBlock extends Plugin {
         registerSubpages(this);
         registerMentionSuggest(this);
         registerLinkPaste(this);
+        registerNoteDrop(this);
         this.addCommand({
             id: 'apply-page-template',
             name: 'Apply page template',
@@ -180,8 +188,10 @@ export default class NotionBlock extends Plugin {
         await this.writeSettings();
         this.syncBulletClass();
         this.explorerDecor?.refresh();
+        this.explorerSort?.refresh();
         this.pageHeaders?.update();
         this.linkIcons?.update();
+        this.pageLinks?.update();
         this.breadcrumbs?.update();
         // Notify editor extensions that settings have changed
         this.app.workspace.updateOptions();

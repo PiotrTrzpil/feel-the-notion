@@ -1,7 +1,7 @@
 import { TFile, debounce } from "obsidian";
 import type NotionBlock from "./main";
 import { folderOfNote } from "./folderNotes";
-import { parseIcon } from "./pageMeta";
+import { DEFAULT_FOLDER_ICON, DEFAULT_PAGE_ICON, parseIcon } from "./pageMeta";
 import { buildExplorerCss, IconStyle } from "./explorerStyles";
 import { iconStyle, noteIcon } from "./pageIcons";
 
@@ -36,7 +36,11 @@ export class ExplorerDecor {
 		const fileIcons = new Map<string, IconStyle>();
 		const folderIcons = new Map<string, IconStyle>();
 
-		if (settings.enabled && settings.pageHeader) {
+		const iconsOn = settings.enabled && settings.pageHeader;
+		const defaultPageIcon = iconsOn ? iconStyle(DEFAULT_PAGE_ICON) : null;
+		const defaultFolderIcon = iconsOn ? iconStyle(DEFAULT_FOLDER_ICON) : null;
+
+		if (iconsOn) {
 			for (const file of app.vault.getMarkdownFiles()) {
 				const icon = noteIcon(app, file);
 				const style = icon && iconStyle(icon);
@@ -61,6 +65,8 @@ export class ExplorerDecor {
 			pageFolders: [...folderNotes.keys()],
 			fileIcons,
 			folderIcons,
+			defaultPageIcon,
+			defaultFolderIcon,
 			activeFolder: activeOwner !== null && folderNotes.has(activeOwner) ? activeOwner : null,
 		});
 	}

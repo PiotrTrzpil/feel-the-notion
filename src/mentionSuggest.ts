@@ -14,7 +14,7 @@ import { EditorView } from "@codemirror/view";
 import type NotionBlock from "./main";
 import { findMentionQuery } from "./mentionTrigger";
 import { isInsideCodeFence } from "./codeFence";
-import { noteIcon, renderIcon } from "./pageIcons";
+import { renderIcon, shownPageIcon } from "./pageIcons";
 import { PageIcon } from "./pageMeta";
 
 /**
@@ -103,7 +103,7 @@ class MentionSuggest extends EditorSuggest<MentionItem> {
 			return;
 		}
 
-		renderIcon(icon, noteIcon(this.app, item.file) ?? { kind: "lucide", id: "file-text" });
+		renderIcon(icon, shownPageIcon(this.plugin, item.file));
 		renderLabel(title, item.file.basename, item.match);
 		const folder = item.file.parent;
 		if (folder && !folder.isRoot()) content.createDiv({ cls: "suggestion-note", text: folder.path });

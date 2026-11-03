@@ -1,7 +1,9 @@
-import { Keymap, MarkdownRenderChild, TAbstractFile, TFile, TFolder, debounce, setIcon } from "obsidian";
+import { Keymap, MarkdownRenderChild, TAbstractFile, TFile, TFolder, debounce } from "obsidian";
 import type NotionBlock from "./main";
 import { basename, folderOfNote, joinPath, parentPath } from "./folderNotes";
-import { folderIcon, folderNote, noteIcon, renderIcon } from "./pageIcons";
+import { orderSubpages } from "./explorerOrder";
+import { mentionedChildPaths } from "./explorerSort";
+import { folderNote, renderIcon, shownFolderIcon, shownPageIcon } from "./pageIcons";
 import { SUBPAGES_LANGUAGE } from "./pageBlocks";
 
 /**
@@ -11,7 +13,8 @@ import { SUBPAGES_LANGUAGE } from "./pageBlocks";
  * A page's sub-pages are the notes in its folder: for a folder note, the
  * folder it belongs to; for a plain note, a folder of its own name beside it,
  * if there is one. A sub-folder counts as one sub-page, its folder note.
- * The list redraws as pages are added, renamed or removed.
+ * A folder note lists them in the order it links them, then by name. The
+ * list redraws as pages are added, renamed or removed.
  */
 export function registerSubpages(plugin: NotionBlock): void {
 	plugin.registerMarkdownCodeBlockProcessor(SUBPAGES_LANGUAGE, (_source, el, ctx) => {
@@ -60,7 +63,13 @@ class SubpagesList extends MarkdownRenderChild {
 				entries.push({ note: child, name: child.basename, isFolder: false, path: child.path });
 			}
 		}
-		return entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+		// The same order the file explorer uses for this folder, so the list
+		// and the tree agree. A plain note has no arrangement of its own.
+		const note = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
+		const mentioned = note instanceof TFile && folderOfNote(note.path) === folder.path
+			? mentionedChildPaths(this.plugin.app, folder.path, note)
+			: [];
+		return orderSubpages(entries.map((entry) => ({ ...entry, page: true })), mentioned);
 	}
 
 	private render(): void {
@@ -81,11 +90,7 @@ class SubpagesList extends MarkdownRenderChild {
 		const { app } = this.plugin;
 		const row = parent.createEl("a", { cls: "ftn-subpage internal-link" });
 		const iconEl = row.createSpan({ cls: "ftn-subpage-icon" });
-		const icon = entry.isFolder
-			? folderIcon(this.plugin, entry.path)
-			: entry.note && noteIcon(app, entry.note);
-		if (icon) renderIcon(iconEl, icon);
-		else setIcon(iconEl, entry.isFolder && !entry.note ? "folder" : "file-text");
+		renderIcon(iconEl, iconOf(this.plugin, entry));
 		row.createSpan({ cls: "ftn-subpage-name", text: entry.name });
 
 		const note = entry.note;
@@ -110,6 +115,12 @@ class SubpagesList extends MarkdownRenderChild {
 			});
 		});
 	}
+}
+
+/** A sub-page shows its page icon. A folder that is not a page shows a directory icon. */
+function iconOf(plugin: NotionBlock, entry: Entry) {
+	if (entry.isFolder || entry.note === null) return shownFolderIcon(plugin, entry.path);
+	return shownPageIcon(plugin, entry.note);
 }
 
 function isPage(file: TAbstractFile): file is TFile {
