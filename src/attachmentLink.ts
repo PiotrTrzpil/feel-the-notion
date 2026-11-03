@@ -32,6 +32,18 @@ export function isAttachmentPath(path: string): boolean {
 	return name.slice(dot + 1).toLowerCase() !== "md";
 }
 
+/**
+ * An embedded PDF is drawn as an attachment row.
+ *
+ * Other embeds stay embeds: an image is the picture, audio and video play.
+ * A PDF embed is Obsidian's full viewer, which is the wrong shape for a
+ * page of notes. The extension is the file's, after the link has resolved,
+ * so `![[report]]` that points at `report.pdf` counts.
+ */
+export function embedAsAttachmentRow(extension: string): boolean {
+	return extension.toLowerCase() === "pdf";
+}
+
 /** The file name without its directory or extension. */
 export function linkDisplayName(path: string): string {
 	const name = path.split("/").pop() ?? path;

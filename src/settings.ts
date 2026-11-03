@@ -345,6 +345,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .setDesc(
                 'Off: an attachment is inserted as a link, [name](path). '
                 + 'On: it gets a leading "!" so Obsidian renders it inline. '
+                + 'A PDF is still the attachment row while "Attachment links are blocks" is on. '
                 + 'Either way the file is saved wherever Files & Links says attachments go.'
             )
             .addToggle(toggle => toggle
@@ -356,7 +357,9 @@ export class BlockPluginSettingTab extends PluginSettingTab {
             .setDesc(
                 'A link to an attachment is drawn as a single block: a paperclip and the file name. '
                 + 'The caret cannot sit inside the link, and Backspace beside it removes the whole link. '
-                + 'Embeds are left alone, so an image still shows as an image.'
+                + 'An embedded PDF is drawn the same way, instead of as the full viewer. '
+                + 'Other embeds are left alone, so an image still shows as an image. '
+                + 'Turn this off to get the viewer back.'
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.attachmentLinks)

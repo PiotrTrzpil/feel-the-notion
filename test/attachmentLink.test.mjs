@@ -8,7 +8,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeLinkPath, isAttachmentPath, linkDisplayName, toMarkdownLink } from "./.build/attachmentLink.js";
+import { embedAsAttachmentRow, encodeLinkPath, isAttachmentPath, linkDisplayName, toMarkdownLink } from "./.build/attachmentLink.js";
 
 test("an attachment is any file that is not a markdown note", () => {
 	assert.equal(isAttachmentPath("Attachments/report.pdf"), true);
@@ -16,6 +16,14 @@ test("an attachment is any file that is not a markdown note", () => {
 	assert.equal(isAttachmentPath("Travel/Travel.md"), false);
 	assert.equal(isAttachmentPath("Makefile"), false);
 	assert.equal(isAttachmentPath(".gitignore"), false);
+});
+
+test("only a PDF embed is an attachment row", () => {
+	assert.equal(embedAsAttachmentRow("pdf"), true);
+	assert.equal(embedAsAttachmentRow("PDF"), true);
+	assert.equal(embedAsAttachmentRow("png"), false);
+	assert.equal(embedAsAttachmentRow("mp4"), false);
+	assert.equal(embedAsAttachmentRow("md"), false);
 });
 
 test("a wikilink becomes a markdown link", () => {

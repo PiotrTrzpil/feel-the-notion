@@ -930,6 +930,25 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
     padding: 0.28em 0.5em 0.28em 0;
 }
 
+/* The PDF row replaces the line, so it is a direct child of .cm-content.
+   Obsidian forces every such child to display:block, which puts the icon
+   (itself a flex box) on its own line above the file name. This wins that
+   rule and keeps the icon and the name on one row, only as wide as the name. */
+.markdown-source-view.mod-cm6 .cm-content > .ftn-page-link {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 100%;
+}
+
+/* On the line the caret is on, Live Preview still mounts the viewer beside
+   the row. The row is the attachment. */
+body.ftn-attachment-rows .markdown-source-view.mod-cm6 .pdf-embed {
+    display: none;
+}
+
 /* A little gap between rows, outside the hover. Still one row. */
 .cm-line:has(> .ftn-page-link.is-block) {
     padding-top: 0.12em;
@@ -949,7 +968,7 @@ a.internal-link.ftn-page-link:hover {
 }
 
 .ftn-page-link-icon {
-    display: flex;
+    display: inline-flex;
     flex: none;
     align-items: center;
     justify-content: center;
