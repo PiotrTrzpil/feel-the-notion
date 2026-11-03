@@ -49,6 +49,7 @@ await esbuild.build({
 		"src/colorWrap.ts",
 		"src/tableOfContents.ts",
 		"src/folderNotes.ts",
+		"src/mosaicLayout.ts",
 		"src/pageMeta.ts",
 		"src/explorerStyles.ts",
 		"src/explorerOrder.ts",

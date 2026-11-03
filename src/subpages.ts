@@ -1,6 +1,6 @@
 import { Keymap, MarkdownRenderChild, TAbstractFile, TFile, TFolder, debounce } from "obsidian";
 import type NotionBlock from "./main";
-import { basename, folderOfNote, joinPath, parentPath } from "./folderNotes";
+import { basename, folderOfNote, isAttachmentsFolder, joinPath, parentPath } from "./folderNotes";
 import { orderSubpages } from "./explorerOrder";
 import { mentionedChildPaths } from "./explorerSort";
 import { folderNote, renderIcon, shownFolderIcon, shownPageIcon } from "./pageIcons";
@@ -58,6 +58,7 @@ class SubpagesList extends MarkdownRenderChild {
 		const entries: Entry[] = [];
 		for (const child of folder.children) {
 			if (child instanceof TFolder) {
+				if (isAttachmentsFolder(child.path)) continue;
 				entries.push({ note: folderNote(this.plugin.app, child), name: child.name, isFolder: true, path: child.path });
 			} else if (isPage(child) && child.path !== this.sourcePath) {
 				entries.push({ note: child, name: child.basename, isFolder: false, path: child.path });

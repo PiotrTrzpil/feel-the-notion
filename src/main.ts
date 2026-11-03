@@ -16,7 +16,7 @@ import { RELEASE_NOTES, shouldShowWhatsNew } from './whatsNew';
 import { WhatsNewModal } from './whatsNewModal';
 import { ExplorerDecor } from './explorerDecor';
 import { ExplorerSort } from './explorerSort';
-import { FolderNotes } from './folderNoteView';
+import { FolderNoteFooter, FolderNotes } from './folderNoteView';
 import { PageHeaders } from './pageHeader';
 import { importIconizeIcons } from './iconizeImport';
 import { LinkIcons } from './linkIcons';
@@ -35,6 +35,7 @@ export default class NotionBlock extends Plugin {
     settings: BlockPluginSettings;
     private explorerDecor: ExplorerDecor | null = null;
     private explorerSort: ExplorerSort | null = null;
+    private folderNoteFooter: FolderNoteFooter | null = null;
     private pageHeaders: PageHeaders | null = null;
     private linkIcons: LinkIcons | null = null;
     private pageLinks: PageLinks | null = null;
@@ -62,6 +63,7 @@ export default class NotionBlock extends Plugin {
         // events and checks its setting when they fire, so turning one off
         // takes effect without a reload.
         new FolderNotes(this);
+        this.folderNoteFooter = new FolderNoteFooter(this);
         this.explorerDecor = new ExplorerDecor(this);
         this.explorerSort = new ExplorerSort(this);
         this.pageHeaders = new PageHeaders(this);
@@ -189,6 +191,7 @@ export default class NotionBlock extends Plugin {
         this.syncBulletClass();
         this.explorerDecor?.refresh();
         this.explorerSort?.refresh();
+        this.folderNoteFooter?.update();
         this.pageHeaders?.update();
         this.linkIcons?.update();
         this.pageLinks?.update();

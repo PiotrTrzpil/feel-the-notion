@@ -595,6 +595,12 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
     font-weight: var(--nav-item-weight-active);
 }
 
+/* `_attachments` folders are greyed out in the file explorer. */
+.workspace-leaf-content[data-type="file-explorer"] .nav-folder-title:is([data-path="_attachments"], [data-path$="/_attachments"]) {
+    color: var(--text-faint);
+    opacity: 0.65;
+}
+
 /* ---- Pages: header above the title ------------------------------------ */
 
 .ftn-page-header {
@@ -896,6 +902,107 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
 .ftn-subpages-empty {
     color: var(--text-faint);
     font-size: var(--font-ui-small);
+}
+
+/* ---- Pages: folder note unlinked footer -------------------------------- */
+
+.ftn-folder-footer {
+    margin-top: 1em;
+    padding-top: 0.6em;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+/* The source sizer is a column at least one pane tall, and the content
+   container grows to fill it, so an in-flow footer sits on the bottom edge
+   of the window. Take it out of that flow. folderNoteView places `top` a
+   couple of lines below the last line of the note. Hidden until that runs,
+   so it does not flash at the bottom of the pane. */
+.cm-sizer > .ftn-folder-footer,
+.markdown-preview-sizer > .ftn-folder-footer {
+    position: absolute;
+    z-index: 2;
+    margin-top: 0;
+    visibility: hidden;
+}
+
+.markdown-source-view.mod-cm6.is-readable-line-width .cm-sizer > .ftn-folder-footer,
+.markdown-preview-view.is-readable-line-width .markdown-preview-sizer > .ftn-folder-footer {
+    max-width: var(--max-width);
+    width: var(--line-width);
+    margin-inline: var(--content-margin);
+}
+
+.ftn-folder-footer-title {
+    margin-bottom: 4px;
+    padding: 0 6px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    user-select: none;
+}
+
+.ftn-folder-footer-row {
+    justify-content: space-between;
+}
+
+.ftn-folder-footer-link {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.ftn-folder-footer-link:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
+.ftn-folder-footer-link .ftn-subpage-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ftn-folder-footer-action {
+    opacity: 0;
+    padding: 2px 4px;
+    height: auto;
+    color: var(--text-muted);
+    transition: opacity 100ms ease;
+}
+
+.ftn-folder-footer-row:hover .ftn-folder-footer-action,
+.ftn-folder-footer-action:focus-visible {
+    opacity: 1;
+}
+
+.ftn-folder-footer-action svg {
+    width: 14px;
+    height: 14px;
+}
+
+.ftn-mosaic {
+    position: relative;
+    margin-top: 4px;
+}
+
+.ftn-mosaic-tile {
+    position: absolute;
+    display: block;
+    overflow: hidden;
+    border-radius: 4px;
+    background-color: var(--background-secondary);
+}
+
+.ftn-mosaic-tile img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
 }
 
 /* A link to a sub-page or a nested page: one block, not editable letters.

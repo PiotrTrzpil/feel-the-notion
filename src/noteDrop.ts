@@ -1,13 +1,17 @@
 /**
- * Dropping a markdown file onto a note.
+ * Dropping a markdown file or a folder onto a note.
  *
  * An image dropped on a note is saved and referenced where the pointer was.
  * A markdown file is the same gesture, but the file is a page: it belongs in
  * the folder that represents the current note, and the note links it there.
- * This plans the link text. Saving the file is the caller's job.
+ * A folder is that same gesture for a whole tree: it becomes a subfolder of
+ * the current page, and a folder note, so the link opens it as a page.
+ * This plans the link text and where the tree goes. Saving is the caller's job.
  *
  * Pure. See test/noteDrop.test.mjs.
  */
+
+import { basename, folderNotePath, isWithin, joinPath, parentPath, planSubPageFolder } from "./folderNotes";
 
 /** A markdown note, by file name. `.markdown` counts; a path's directory does not. */
 export function isMarkdownFileName(name: string): boolean {
@@ -252,4 +256,270 @@ function frontmatterClose(doc: string): number | null {
 
 function clamp(n: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, n));
+}
+
+/** One file or directory inside a dropped folder, relative to that folder. */
+export interface DropTreeEntry {
+	/** `/`-separated path. No leading slash, no `.` or `..` segments. */
+	relative: string;
+	kind: "file" | "dir";
+}
+
+/** A file the caller copies from the dropped folder into the vault. */
+export interface DirectoryCopy {
+	/** Path relative to the dropped directory, for reading the source. */
+	relative: string;
+	/** Vault path to write. */
+	dest: string;
+}
+
+/**
+ * Where a dropped folder lands, and which file becomes its folder note.
+ *
+ * `moveFrom` is set when the folder is already in the vault: the caller
+ * renames that folder onto `folder` instead of copying `copies`. An outside
+ * folder leaves `moveFrom` null and lists every directory to create.
+ */
+export interface DirectoryDropPlan {
+	folder: string;
+	moveFrom: string | null;
+	/**
+	 * Relative path of the file that already is this folder's note, or null
+	 * when the caller creates an empty one at `notePath`.
+	 */
+	noteSource: string | null;
+	/** Vault path of the folder note. This is what the drop links. */
+	notePath: string;
+	/** Directories to create, parents before children. Empty when moving. */
+	directories: string[];
+	/** Files to copy, excluding `noteSource`. Empty when moving. */
+	copies: DirectoryCopy[];
+}
+
+/**
+ * The page name of a dropped folder.
+ *
+ * The same characters that break a note name break a folder that has to be
+ * linked. Leading dots are dropped so the page is not a hidden file. Empty
+ * when nothing usable is left; the caller supplies a fallback.
+ */
+export function folderNameFromEntry(name: string): string {
+	const base = basename(name);
+	return base
+		.replace(ILLEGAL_IN_NOTE_NAME, "-")
+		.replace(/^\.+/, "")
+		.replace(/\.+$/, "")
+		.trim();
+}
+
+/**
+ * Where a folder dropped on `sourceNotePath` is placed under `parent`.
+ *
+ * The tree keeps its shape. The dropped folder itself becomes a folder note:
+ * a top-level `<name>.md` already in the tree is that note, and anything else
+ * gets an empty one. A name the vault already uses gains a numeric suffix,
+ * and the note is renamed with it so the pair still matches.
+ *
+ * `{ skip: "self" }` when the folder is the page it was dropped on, or
+ * contains it. Moving a folder into itself is not a placement.
+ */
+export function planDirectoryDrop(input: {
+	parent: string;
+	dirName: string;
+	entries: readonly DropTreeEntry[];
+	fallbackName: string;
+	exists: (path: string) => boolean;
+	sourceNotePath: string;
+	vaultDir: string | null;
+}): DirectoryDropPlan | { skip: "self" } {
+	const { parent, dirName, entries, fallbackName, exists, sourceNotePath, vaultDir } = input;
+	if (vaultDir !== null && isDirectorySelfDrop(sourceNotePath, vaultDir)) return { skip: "self" };
+
+	const rawBase = basename(dirName);
+	const safeBase = folderNameFromEntry(dirName) || fallbackName;
+	const files = treeFiles(entries);
+	const folder = allocateFolder(parent, safeBase, vaultDir, exists, files, rawBase);
+	const notePath = folderNotePath(folder);
+	if (notePath === null) throw new Error("no available folder name");
+	const noteSource = findNoteSource(files, rawBase);
+
+	if (vaultDir !== null) {
+		return { folder, moveFrom: vaultDir, noteSource, notePath, directories: [], copies: [] };
+	}
+
+	const used = new Set<string>([notePath]);
+	const copies: DirectoryCopy[] = [];
+	for (const relative of files) {
+		if (relative === noteSource) continue;
+		const dest = uniqueDest(joinRelative(folder, safeRelative(relative)), used);
+		used.add(dest);
+		copies.push({ relative, dest });
+	}
+
+	const dirRels: string[] = [];
+	for (const entry of entries) {
+		if (entry.kind !== "dir" || isSkippedDropPath(entry.relative)) continue;
+		const rel = normalizeRelative(entry.relative);
+		if (rel === null) continue;
+		dirRels.push(safeRelative(rel));
+	}
+
+	return {
+		folder,
+		moveFrom: null,
+		noteSource,
+		notePath,
+		directories: directoryPaths(folder, dirRels, copies.map((copy) => copy.dest), notePath),
+		copies,
+	};
+}
+
+/**
+ * The dropped folder is the note itself, or the folder that note is about to
+ * become. Either way the drop would move a folder into its own contents.
+ */
+export function isDirectorySelfDrop(sourceNotePath: string, vaultDir: string): boolean {
+	if (isWithin(sourceNotePath, vaultDir)) return true;
+	const future = planSubPageFolder(sourceNotePath).folder;
+	return future === vaultDir || isWithin(future, vaultDir);
+}
+
+/** `.DS_Store` is Finder metadata, not content of the folder. */
+function isSkippedDropPath(relative: string): boolean {
+	return relative.split(/[/\\]/).some((part) => part === ".DS_Store");
+}
+
+function treeFiles(entries: readonly DropTreeEntry[]): string[] {
+	const files: string[] = [];
+	for (const entry of entries) {
+		if (entry.kind !== "file" || isSkippedDropPath(entry.relative)) continue;
+		const rel = normalizeRelative(entry.relative);
+		if (rel !== null) files.push(rel);
+	}
+	files.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+	return files;
+}
+
+/**
+ * First `base`, `base 1`, ... under `parent` that is free and can hold a
+ * folder note.
+ *
+ * `vaultDir` is free even when it exists: the drop is already that folder.
+ * A suffix that would make the folder note land on a different file in the
+ * tree is skipped, so the note never takes over some other file's name.
+ */
+function allocateFolder(
+	parent: string,
+	base: string,
+	vaultDir: string | null,
+	exists: (path: string) => boolean,
+	files: readonly string[],
+	rawBase: string
+): string {
+	for (let n = 0; n < 1000; n++) {
+		const name = n === 0 ? base : `${base} ${n}`;
+		const path = joinPath(parent, name);
+		if (folderNotePath(path) === null) continue;
+		if (path !== vaultDir && exists(path)) continue;
+		if (noteNameTaken(files, rawBase, name)) continue;
+		return path;
+	}
+	throw new Error("no available folder name");
+}
+
+/** A top-level file already uses the folder-note name, and it is not the note. */
+function noteNameTaken(files: readonly string[], rawBase: string, folderBase: string): boolean {
+	const source = findNoteSource(files, rawBase);
+	const wanted = `${folderBase}.md`.toLowerCase();
+	if (source !== null && basename(source).toLowerCase() === wanted) return false;
+	return files.some((rel) => !rel.includes("/") && rel.toLowerCase() === wanted);
+}
+
+/**
+ * A top-level `<folder>.md` in the dropped tree is already the folder note.
+ *
+ * Matching ignores case. On a case-insensitive disk `paris.md` is `Paris.md`,
+ * and creating a second one would write the same file twice.
+ */
+function findNoteSource(files: readonly string[], rawBase: string): string | null {
+	const wanted = `${rawBase}.md`.toLowerCase();
+	for (const rel of files) {
+		if (rel.includes("/")) continue;
+		if (rel.toLowerCase() === wanted) return rel;
+	}
+	return null;
+}
+
+/** `..` cannot appear in a real directory listing; a path that has one is refused. */
+function normalizeRelative(relative: string): string | null {
+	const parts = relative.replace(/\\/g, "/").split("/").filter((part) => part !== "" && part !== ".");
+	if (parts.length === 0 || parts.some((part) => part === "..")) return null;
+	return parts.join("/");
+}
+
+/** A vault-safe relative path. Dots stay, so `.gitignore` is still copied. */
+function safeRelative(relative: string): string {
+	return relative.split("/").map(safeSegment).join("/");
+}
+
+function safeSegment(segment: string): string {
+	const cleaned = segment.replace(ILLEGAL_IN_NOTE_NAME, "-").trim();
+	if (cleaned === "" || cleaned === "." || cleaned === "..") return "untitled";
+	return cleaned;
+}
+
+function joinRelative(folder: string, relative: string): string {
+	return joinPath(folder, relative);
+}
+
+function uniqueDest(path: string, used: Set<string>): string {
+	if (!used.has(path)) return path;
+	const slash = path.lastIndexOf("/");
+	const dir = slash === -1 ? "" : path.slice(0, slash);
+	const base = slash === -1 ? path : path.slice(slash + 1);
+	const dot = base.lastIndexOf(".");
+	const stem = dot > 0 ? base.slice(0, dot) : base;
+	const ext = dot > 0 ? base.slice(dot) : "";
+	for (let n = 1; n < 1000; n++) {
+		const candidate = joinPath(dir, `${stem} ${n}${ext}`);
+		if (!used.has(candidate)) return candidate;
+	}
+	throw new Error("no available file name");
+}
+
+/**
+ * The dropped folder plus every directory a file or an empty dir needs.
+ *
+ * A path that is a file (the folder note included) is not also created as a
+ * directory. `Name.md` can be both in a tree someone built by hand.
+ */
+function directoryPaths(
+	folder: string,
+	dirRels: readonly string[],
+	fileDests: readonly string[],
+	notePath: string
+): string[] {
+	const files = new Set(fileDests);
+	files.add(notePath);
+	const set = new Set<string>();
+	const add = (path: string) => {
+		if (path === "" || path === "/" || files.has(path)) return;
+		if (path !== folder && !path.startsWith(`${folder}/`)) return;
+		set.add(path);
+	};
+	add(folder);
+	for (const rel of dirRels) add(joinRelative(folder, rel));
+	for (const dest of fileDests) {
+		let parent = parentPath(dest);
+		while (parent === folder || parent.startsWith(`${folder}/`)) {
+			add(parent);
+			if (parent === folder) break;
+			parent = parentPath(parent);
+		}
+	}
+	return [...set].sort((a, b) => {
+		const depth = a.split("/").length - b.split("/").length;
+		if (depth !== 0) return depth;
+		return a < b ? -1 : a > b ? 1 : 0;
+	});
 }

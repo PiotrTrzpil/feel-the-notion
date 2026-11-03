@@ -113,6 +113,7 @@ function foldAt(folds: DecorationSet, from: number): { from: number; to: number 
 			found = { from: start, to: end };
 			return false;
 		}
+		return;
 	});
 	return found;
 }
@@ -167,6 +168,7 @@ export function foldHidingLineEnd(view: EditorView, lineNo: number): number | nu
 			last = doc.lineAt(foldTo).number;
 			return false;
 		}
+		return;
 	});
 	return last;
 }

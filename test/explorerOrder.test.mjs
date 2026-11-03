@@ -5,7 +5,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { childForTarget, orderSubpages } from "./.build/explorerOrder.js";
+import { childForTarget, childOfFolder, orderSubpages, unlinkedChildren } from "./.build/explorerOrder.js";
 
 const children = [
 	{ path: "Travel/Page 10.md", name: "Page 10", page: true },
@@ -19,6 +19,27 @@ test("a link names the child it points at", () => {
 	assert.equal(childForTarget("Travel", "Travel/Rome.md", "Travel/Travel.md"), "Travel/Rome.md");
 	assert.equal(childForTarget("Travel", "Travel/Paris/Hotel.md", "Travel/Travel.md"), "Travel/Paris");
 	assert.equal(childForTarget("Travel", "Travel/Paris/Paris.md", "Travel/Travel.md"), "Travel/Paris");
+});
+
+test("childOfFolder also matches attachments and files inside subfolders", () => {
+	assert.equal(childOfFolder("Travel", "Travel/photo.png", "Travel/Travel.md"), "Travel/photo.png");
+	assert.equal(childOfFolder("Travel", "Travel/Paris/map.pdf", "Travel/Travel.md"), "Travel/Paris");
+	assert.equal(childOfFolder("Travel", "Travel/Travel.md", "Travel/Travel.md"), null);
+	assert.equal(childOfFolder("Travel", "Other/photo.png", "Travel/Travel.md"), null);
+});
+
+test("unlinkedChildren keeps only unlinked items, pages first then files by name, and skips _attachments", () => {
+	const items = [
+		...children,
+		{ path: "Travel/Travel.md", name: "Travel", page: false },
+		{ path: "Travel/_attachments", name: "_attachments", page: false },
+	];
+	const linked = new Set(["Travel/Page 10.md", "Travel/alpha.png"]);
+	assert.deepEqual(
+		unlinkedChildren(items, linked, "Travel/Travel.md").map((c) => c.path),
+		["Travel/Page 2.md", "Travel/Paris", "Travel/beta.pdf"],
+	);
+	assert.equal(childOfFolder("Travel", "Travel/_attachments/photo.png", "Travel/Travel.md"), null);
 });
 
 test("the folder's own note, a file, and an outside note are not sub-pages", () => {

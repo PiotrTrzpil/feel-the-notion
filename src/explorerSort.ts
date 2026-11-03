@@ -1,7 +1,7 @@
 import { App, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import type NotionBlock from "./main";
-import { TreeChild, childForTarget, orderSubpages } from "./explorerOrder";
-import { folderOfNote } from "./folderNotes";
+import { TreeChild, childForTarget, childOfFolder, orderSubpages } from "./explorerOrder";
+import { folderOfNote, isAttachmentsFolder } from "./folderNotes";
 import { folderNote } from "./pageIcons";
 
 /**
@@ -124,9 +124,28 @@ export function mentionedChildPaths(app: App, folderPath: string, note: TFile): 
 	return out;
 }
 
+/** Direct child paths of `folderPath` that `note` links or embeds anywhere (body or frontmatter). */
+export function linkedChildPaths(app: App, folderPath: string, note: TFile): Set<string> {
+	const cache = app.metadataCache.getFileCache(note);
+	const refs = [
+		...(cache?.links ?? []),
+		...(cache?.embeds ?? []),
+		...(cache?.frontmatterLinks ?? []),
+	];
+	const seen = new Set<string>();
+	for (const ref of refs) {
+		const dest = app.metadataCache.getFirstLinkpathDest(ref.link, note.path);
+		if (!dest) continue;
+		const child = childOfFolder(folderPath, dest.path, note.path);
+		if (child) seen.add(child);
+	}
+	return seen;
+}
+
 function describe(file: TAbstractFile, ownNote: string): TreeChild {
 	const folder = file instanceof TFolder;
-	const page = folder || (file instanceof TFile && file.extension === "md" && file.path !== ownNote);
+	const page = (folder && !isAttachmentsFolder(file.path))
+		|| (file instanceof TFile && file.extension === "md" && file.path !== ownNote);
 	return {
 		path: file.path,
 		name: file instanceof TFile && file.extension === "md" ? file.basename : file.name,

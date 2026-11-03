@@ -1,21 +1,24 @@
 import { EditorView } from "@codemirror/view";
-import { Editor, FileSystemAdapter, MarkdownFileInfo, MarkdownView, Notice, TFile, editorInfoField } from "obsidian";
+import { Editor, FileSystemAdapter, MarkdownFileInfo, MarkdownView, Notice, TFile, TFolder, editorInfoField } from "obsidian";
 import type NotionBlock from "./main";
 import { toMarkdownLink } from "./attachmentLink";
 import { availableNotePath, isImageFile, saveAttachment } from "./blockTransform";
-import { parentPath } from "./folderNotes";
+import { joinPath, parentPath } from "./folderNotes";
 import { subPageFolder } from "./folderNoteView";
 import { dispatchBlockEdit } from "./history";
 import { t } from "./locale/helpers";
 import {
 	attachUriPaths,
 	filePathsFromUriList,
+	isDirectorySelfDrop,
 	isMarkdownDrop,
 	isMarkdownFileName,
 	normalizeNoteText,
 	noteNameFromFile,
+	planDirectoryDrop,
 	planNoteDrop,
 	vaultRelativePath,
+	type DropTreeEntry,
 } from "./noteDrop";
 
 /**
@@ -25,8 +28,11 @@ import {
  * dropped markdown file is handled here instead, and only while folder notes
  * are on: the current note becomes a folder note if it is not one yet, the
  * file is copied into that folder, and a link is written where it was dropped.
- * A file that is already in the vault is moved rather than copied, so the drop
- * does not leave a second note behind.
+ * A folder from the desktop is the same, for the whole tree: it is copied in
+ * as a subfolder, made into a folder note (its own `<name>.md` when it has
+ * one, otherwise an empty note), and linked where it was dropped. A file or
+ * folder that is already in the vault is moved rather than copied, so the drop
+ * does not leave a second copy behind.
  *
  * Any other file in the same drop is saved the way an inserted attachment is.
  * Taking the drop over at all means the core handler will not see those files,
@@ -49,6 +55,8 @@ interface DroppedFile {
 	fsPath: string | null;
 	/** MIME type from the drag item or File, when given. */
 	mime: string | null;
+	/** A Finder folder. Its contents are copied, and it is linked as one page. */
+	isDirectory: boolean;
 }
 
 /** Drops this plugin has already taken, so the fallback cannot insert twice. */
@@ -101,7 +109,7 @@ function acceptDrop(plugin: NotionBlock, evt: DragEvent, editor: Editor, note: T
 	if (note.extension !== "md") return;
 
 	const dropped = droppedFiles(evt);
-	if (!dropped.some((item) => isMarkdownDrop(item.name, item.fsPath, item.mime))) return;
+	if (!dropped.some(isPageDrop)) return;
 
 	// Before any position lookup. A throw after this still leaves the drop
 	// cancelled, so Obsidian cannot fall through to the attachment embed.
@@ -131,13 +139,16 @@ async function placeDropped(
 		// Resolve in-vault notes before subPageFolder: turning a plain note
 		// into a folder note moves it, so a self-drop has to be recognised
 		// while the note is still at its original path.
+		const sourceBefore = note.path;
 		const prepared = dropped.map((item) => {
-			const markdown = isMarkdownDrop(item.name, item.fsPath, item.mime);
+			const markdown = !item.isDirectory && isMarkdownDrop(item.name, item.fsPath, item.mime);
 			const existing = markdown ? vaultMarkdown(plugin, item.fsPath) : null;
-			return { item, markdown, existing };
+			const vaultDir = item.isDirectory ? vaultFolderPath(plugin, item.fsPath) : null;
+			const self = existing?.path === sourceBefore || (vaultDir !== null && isDirectorySelfDrop(sourceBefore, vaultDir));
+			return { item, markdown, existing, vaultDir, self };
 		});
 
-		const actionable = prepared.filter((entry) => entry.existing?.path !== note.path);
+		const actionable = prepared.filter((entry) => !entry.self);
 		let skippedSelf = prepared.length - actionable.length;
 		if (actionable.length === 0) {
 			if (skippedSelf > 0) new Notice(t("notice.dropOntoSelf"));
@@ -152,11 +163,13 @@ async function placeDropped(
 
 		const links: string[] = [];
 		let failed = 0;
-		for (const { item, markdown, existing } of actionable) {
+		for (const { item, markdown, existing, vaultDir } of actionable) {
 			try {
-				const link = markdown
-					? await placeMarkdown(plugin, note, dest, sourcePath, item, existing)
-					: await placeAttachment(plugin, sourcePath, item);
+				const link = item.isDirectory
+					? await placeDirectory(plugin, dest, sourcePath, sourceBefore, item, vaultDir)
+					: markdown
+						? await placeMarkdown(plugin, note, dest, sourcePath, item, existing)
+						: await placeAttachment(plugin, sourcePath, item);
 				if (link === null) skippedSelf++;
 				else links.push(link);
 			} catch (error) {
@@ -206,6 +219,110 @@ async function placeMarkdown(
 		normalizeNoteText(await droppedText(item))
 	);
 	return pageLink(plugin, created, sourcePath);
+}
+
+/**
+ * The dropped folder as a sub-page of `dest`, and the link to write.
+ *
+ * Null when the folder is the page it was dropped on. A folder already in
+ * the vault is moved under `dest`. Anything else is copied file by file.
+ * The folder becomes a folder note: an existing `<name>.md` at its top is
+ * that note, and a folder without one gets an empty note so the link opens.
+ */
+async function placeDirectory(
+	plugin: NotionBlock,
+	dest: string,
+	sourcePath: string,
+	sourceBefore: string,
+	item: DroppedFile,
+	vaultDir: string | null
+): Promise<string | null> {
+	const fsPath = item.fsPath;
+	if (!fsPath) throw new Error("dropped folder has no path");
+	const entries = await readDropTree(fsPath);
+	const plan = planDirectoryDrop({
+		parent: dest,
+		dirName: item.name || fsPath,
+		entries,
+		fallbackName: t("page.untitled"),
+		exists: (path) => plugin.app.vault.getAbstractFileByPath(path) != null,
+		sourceNotePath: sourceBefore,
+		vaultDir,
+	});
+	if ("skip" in plan) return null;
+
+	if (plan.moveFrom !== null) await moveDroppedFolder(plugin, plan.moveFrom, plan.folder, plan.noteSource, plan.notePath);
+	else await copyDroppedFolder(plugin, fsPath, plan.directories, plan.copies, plan.noteSource, plan.notePath);
+
+	const created = plugin.app.vault.getAbstractFileByPath(plan.notePath);
+	if (!(created instanceof TFile)) throw new Error("folder note was not created");
+	return pageLink(plugin, created, sourcePath);
+}
+
+/** Move a vault folder into place, then make sure its folder note has the folder's name. */
+async function moveDroppedFolder(
+	plugin: NotionBlock,
+	moveFrom: string,
+	folder: string,
+	noteSource: string | null,
+	notePath: string
+): Promise<void> {
+	const { fileManager, vault } = plugin.app;
+	if (moveFrom !== folder) {
+		const existing = vault.getAbstractFileByPath(moveFrom);
+		if (!(existing instanceof TFolder)) throw new Error("dropped folder is not in the vault");
+		await fileManager.renameFile(existing, folder);
+	}
+	if (noteSource) {
+		const current = joinPath(folder, noteSource);
+		if (current === notePath) return;
+		const file = vault.getAbstractFileByPath(current);
+		if (file instanceof TFile) {
+			await fileManager.renameFile(file, notePath);
+			return;
+		}
+	}
+	if (!vault.getAbstractFileByPath(notePath)) await vault.create(notePath, "");
+}
+
+/** Copy an outside folder in, then write its folder note. */
+async function copyDroppedFolder(
+	plugin: NotionBlock,
+	root: string,
+	directories: readonly string[],
+	copies: readonly { relative: string; dest: string }[],
+	noteSource: string | null,
+	notePath: string
+): Promise<void> {
+	const { vault } = plugin.app;
+	for (const dir of directories) {
+		if (!vault.getAbstractFileByPath(dir)) await vault.createFolder(dir);
+	}
+	for (const copy of copies) {
+		await writeDroppedFile(plugin, droppedAbsolute(root, copy.relative), copy.dest);
+	}
+	if (noteSource) await writeDroppedFile(plugin, droppedAbsolute(root, noteSource), notePath);
+	else if (!vault.getAbstractFileByPath(notePath)) await vault.create(notePath, "");
+}
+
+/**
+ * One file of a dropped folder, as the vault should store it.
+ *
+ * Markdown is normalised the same way a dropped note is. Everything else is
+ * copied byte for byte, so an image is not re-encoded on the way in.
+ */
+async function writeDroppedFile(plugin: NotionBlock, absolute: string, dest: string): Promise<void> {
+	const { vault } = plugin.app;
+	if (isMarkdownFileName(dest)) {
+		await vault.create(dest, normalizeNoteText(await readDroppedText(absolute)));
+		return;
+	}
+	await vault.createBinary(dest, await readDroppedBytes(absolute));
+}
+
+/** A markdown file or a folder. A folder named `Notes.md` is a folder, not a note. */
+function isPageDrop(item: DroppedFile): boolean {
+	return item.isDirectory || isMarkdownDrop(item.name, item.fsPath, item.mime);
 }
 
 /** A page link, never an embed. `generateMarkdownLink` can come back with a leading `!`. */
@@ -303,6 +420,17 @@ async function droppedAsFile(item: DroppedFile): Promise<File> {
 	return new File([bytes], item.name);
 }
 
+/** The dropped folder's vault path, when it is a folder the vault already has. */
+function vaultFolderPath(plugin: NotionBlock, fsPath: string | null): string | null {
+	if (fsPath === null) return null;
+	const adapter = plugin.app.vault.adapter;
+	if (!(adapter instanceof FileSystemAdapter)) return null;
+	const rel = vaultRelativePath(adapter.getBasePath(), fsPath);
+	if (rel === null) return null;
+	const found = plugin.app.vault.getAbstractFileByPath(rel);
+	return found instanceof TFolder ? rel : null;
+}
+
 function vaultMarkdown(plugin: NotionBlock, fsPath: string | null): TFile | null {
 	if (fsPath === null) return null;
 	const adapter = plugin.app.vault.adapter;
@@ -386,19 +514,24 @@ function droppedFiles(evt: DragEvent): DroppedFile[] {
 		for (let i = 0; i < items.length; i++) {
 			const item = items[i];
 			if (!item || item.kind !== "file") continue;
+			// A folder's entry is only readable during the event. `getAsFile`
+			// on a folder is an empty file, so the directory flag has to be
+			// taken from the entry itself, here, before the first await.
+			const directory = directoryEntry(item);
 			let file: File | null = null;
 			try {
 				file = item.getAsFile();
 			} catch (error) {
 				console.error("feel-the-notion: reading a dropped file failed", error);
 			}
-			if (file) pushDropped(out, seen, file, item.type);
+			if (file) pushDropped(out, seen, file, item.type, directory !== null);
+			else if (directory) pushPath(out, seen, "", directory, true);
 		}
 	}
 	if (transfer.files) {
 		for (let i = 0; i < transfer.files.length; i++) {
 			const file = transfer.files[i];
-			if (file) pushDropped(out, seen, file, file.type);
+			if (file) pushDropped(out, seen, file, file.type, false);
 		}
 	}
 	// When File objects lack a filesystem path, `text/uri-list` still carries
@@ -407,9 +540,12 @@ function droppedFiles(evt: DragEvent): DroppedFile[] {
 	if (out.length === 0 || out.some((item) => item.fsPath === null)) {
 		const uriPaths = filePathsFromUriList(readUriList(transfer));
 		if (out.length > 0) attachUriPaths(out, uriPaths);
-		else for (const fsPath of uriPaths) pushPath(out, seen, fsPath);
+		else for (const fsPath of uriPaths) pushPath(out, seen, fsPath, null, false);
 	}
-	return out;
+	// `webkitGetAsEntry` is missing in some builds. The path is the backup:
+	// a folder and a file are the same drag item until something stats it.
+	classifyDirectories(out);
+	return dedupeByPath(out);
 }
 
 function readUriList(transfer: DataTransfer): string {
@@ -421,20 +557,67 @@ function readUriList(transfer: DataTransfer): string {
 	}
 }
 
-function pushDropped(out: DroppedFile[], seen: Set<string>, file: File, itemType?: string): void {
+function pushDropped(out: DroppedFile[], seen: Set<string>, file: File, itemType: string | undefined, isDirectory: boolean): void {
 	const fsPath = filesystemPath(file);
 	const key = fsPath ?? `${file.name}\0${file.size}\0${file.lastModified}`;
 	if (seen.has(key)) return;
 	seen.add(key);
 	const mime = file.type || itemType || null;
-	out.push({ name: file.name, file, fsPath, mime });
+	out.push({ name: file.name, file, fsPath, mime, isDirectory });
 }
 
-function pushPath(out: DroppedFile[], seen: Set<string>, fsPath: string): void {
-	if (seen.has(fsPath)) return;
-	seen.add(fsPath);
-	const name = fsPath.split(/[/\\]/).pop() ?? fsPath;
-	out.push({ name, file: null, fsPath, mime: null });
+function pushPath(out: DroppedFile[], seen: Set<string>, fsPath: string, name: string | null, isDirectory: boolean): void {
+	const key = fsPath || `dir\0${name ?? ""}`;
+	if (key === "dir\0" || seen.has(key)) return;
+	seen.add(key);
+	const base = name ?? fsPath.split(/[/\\]/).pop() ?? fsPath;
+	out.push({ name: base, file: null, fsPath: fsPath || null, mime: null, isDirectory });
+}
+
+/** The drag item when it is a directory. Null for a file, or when the host has no entry API. */
+function directoryEntry(item: DataTransferItem): string | null {
+	const getter = (item as DataTransferItem & { webkitGetAsEntry?: () => { isDirectory: boolean; name: string } | null }).webkitGetAsEntry;
+	if (!getter) return null;
+	try {
+		const entry = getter.call(item);
+		return entry?.isDirectory ? entry.name : null;
+	} catch (error) {
+		console.error("feel-the-notion: reading a dropped file failed", error);
+		return null;
+	}
+}
+
+/** Set `isDirectory` from the real path. A stat that fails leaves the flag as it was. */
+function classifyDirectories(items: DroppedFile[]): void {
+	for (const item of items) {
+		if (!item.fsPath) continue;
+		const dir = isDirectoryPath(item.fsPath);
+		if (dir !== null) item.isDirectory = dir;
+	}
+}
+
+/** One entry per filesystem path. A folder listed by both `items` and `files` is one drop. */
+function dedupeByPath(items: DroppedFile[]): DroppedFile[] {
+	const seen = new Set<string>();
+	const out: DroppedFile[] = [];
+	for (const item of items) {
+		if (item.fsPath !== null) {
+			if (seen.has(item.fsPath)) continue;
+			seen.add(item.fsPath);
+		}
+		out.push(item);
+	}
+	return out;
+}
+
+function isDirectoryPath(fsPath: string): boolean | null {
+	try {
+		// @ts-ignore fs is provided by the desktop host, not by this package
+		const fs = require("fs") as { statSync: (p: string) => { isDirectory: () => boolean } };
+		return fs.statSync(fsPath).isDirectory();
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -456,4 +639,78 @@ function filesystemPath(file: File): string | null {
 	} catch {
 		return null;
 	}
+}
+
+interface HostDirent {
+	name: string;
+	isDirectory(): boolean;
+	isFile(): boolean;
+	isSymbolicLink(): boolean;
+}
+
+interface HostFs {
+	readdir(path: string, opts: { withFileTypes: true }): Promise<HostDirent[]>;
+	stat(path: string): Promise<{ isFile(): boolean }>;
+	readFile(path: string, encoding: "utf8"): Promise<string>;
+	readFile(path: string): Promise<Uint8Array>;
+}
+
+function hostFs(): HostFs {
+	// fs is a node builtin, external in the bundle, present in desktop Obsidian.
+	// @ts-ignore fs is provided by the desktop host, not by this package
+	return (require("fs") as { promises: HostFs }).promises;
+}
+
+/**
+ * Files and directories inside a dropped folder.
+ *
+ * A symlink to a file is copied as a file. A symlink to a directory is
+ * skipped: following it can walk back into a parent and never finish.
+ * `.DS_Store` is Finder metadata and is not part of the folder.
+ */
+async function readDropTree(root: string): Promise<DropTreeEntry[]> {
+	const out: DropTreeEntry[] = [];
+	await walkDropTree(root, "", out);
+	return out;
+}
+
+async function walkDropTree(dir: string, prefix: string, out: DropTreeEntry[]): Promise<void> {
+	const entries = await hostFs().readdir(dir, { withFileTypes: true });
+	for (const ent of entries) {
+		if (ent.name === ".DS_Store") continue;
+		const rel = prefix === "" ? ent.name : `${prefix}/${ent.name}`;
+		const abs = droppedAbsolute(dir, ent.name);
+		if (ent.isSymbolicLink()) {
+			try {
+				const followed = await hostFs().stat(abs);
+				if (followed.isFile()) out.push({ relative: rel, kind: "file" });
+			} catch (error) {
+				console.error(`feel-the-notion: skipping ${rel}`, error);
+			}
+			continue;
+		}
+		if (ent.isDirectory()) {
+			out.push({ relative: rel, kind: "dir" });
+			await walkDropTree(abs, rel, out);
+			continue;
+		}
+		if (ent.isFile()) out.push({ relative: rel, kind: "file" });
+	}
+}
+
+function droppedAbsolute(root: string, relative: string): string {
+	// @ts-ignore path is provided by the desktop host, not by this package
+	const path = require("path") as { join: (...parts: string[]) => string };
+	return path.join(root, ...relative.split("/"));
+}
+
+async function readDroppedText(absolute: string): Promise<string> {
+	return hostFs().readFile(absolute, "utf8");
+}
+
+async function readDroppedBytes(absolute: string): Promise<ArrayBuffer> {
+	const bytes = await hostFs().readFile(absolute);
+	const copy = new ArrayBuffer(bytes.byteLength);
+	new Uint8Array(copy).set(bytes);
+	return copy;
 }

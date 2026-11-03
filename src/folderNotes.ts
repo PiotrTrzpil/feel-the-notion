@@ -21,9 +21,17 @@ export function joinPath(folder: string, name: string): string {
 	return folder === "" || folder === "/" ? name : `${folder}/${name}`;
 }
 
-/** Where the note of folder `folder` lives; null for the vault root, which has none. */
+/** The special attachments folder name, which is never a page or folder note. */
+export const ATTACHMENTS_FOLDER_NAME = "_attachments";
+
+/** Whether `path` is a folder named `_attachments` (at root or inside a folder). */
+export function isAttachmentsFolder(path: string): boolean {
+	return basename(path) === ATTACHMENTS_FOLDER_NAME;
+}
+
+/** Where the note of folder `folder` lives; null for the vault root or `_attachments`, which have none. */
 export function folderNotePath(folder: string): string | null {
-	if (folder === "" || folder === "/") return null;
+	if (folder === "" || folder === "/" || isAttachmentsFolder(folder)) return null;
 	return `${folder}/${basename(folder)}.md`;
 }
 

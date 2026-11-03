@@ -70,6 +70,8 @@ export interface BlockPluginSettings {
     bulletHidden: string[];
     /** Folders open their note on click; the note is hidden inside them. */
     folderNotes: boolean;
+    /** An image-only folder note shows a mosaic instead of a file list. */
+    imageMosaic: boolean;
     /** A link to a sub-page or a nested page is one block, not editable text. */
     pageLinkBlocks: boolean;
     /** Icon and cover above a note's title, and icons in the file explorer. */
@@ -140,6 +142,9 @@ export const DEFAULT_SETTINGS: BlockPluginSettings = {
     // note, an `icon` or `banner` field), apart from the "Add icon" and "Add
     // cover" buttons that appear while hovering a note's title.
     folderNotes: true,
+    // ON by default: it only changes how an image-only folder note draws the
+    // files it does not link yet. Mixed folders keep the list.
+    imageMosaic: true,
     // ON by default: a sub-page link is a page block in Notion, and the
     // letters of the link are not something you edit.
     pageLinkBlocks: true,
@@ -379,16 +384,29 @@ export class BlockPluginSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Folder notes')
             .setDesc(
-                'A folder whose note sits inside it under the same name (Travel/Travel.md) opens that '
-                + 'note when clicked, and the note is hidden from the folder\'s contents. Renaming one '
-                + 'renames the other. The file explorer lists that folder\'s pages in the order the note '
+                'Clicking a folder opens its note, creating an empty one when the folder has none yet '
+                + '(Travel/Travel.md). The arrow expands the folder; clicking the name does not. The note is hidden from '
+                + 'the folder\'s contents. Renaming one renames the other. The file explorer lists that '
+                + 'folder\'s pages in the order the note '
                 + 'links them, and pages it never links by name. The "Page" insert item makes the new page '
                 + 'a sub-page. Dropping a markdown file on a note copies it into that folder and links it '
-                + 'where it was dropped.'
+                + 'where it was dropped. Dropping a folder copies the whole folder in as a sub-page, '
+                + 'makes it a folder note, and links it there.'
             )
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.folderNotes)
                 .onChange((value) => this.store('folderNotes', value)));
+
+        new Setting(containerEl)
+            .setName('Image folders as a mosaic')
+            .setDesc(
+                'When everything a folder note has not linked yet is an image, those images are shown '
+                + 'as a mosaic at the bottom of the note instead of a file list. A page, a subfolder, '
+                + 'or any other file keeps the list. Click a photo to open it.'
+            )
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.imageMosaic)
+                .onChange((value) => this.store('imageMosaic', value)));
 
         new Setting(containerEl)
             .setName('Sub-page links are blocks')

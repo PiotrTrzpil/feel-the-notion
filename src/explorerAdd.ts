@@ -1,6 +1,7 @@
 import { Notice, TFile, TFolder, setIcon } from "obsidian";
 import type NotionBlock from "./main";
 import { availableNotePath } from "./blockTransform";
+import { isAttachmentsFolder } from "./folderNotes";
 import { subPageFolder } from "./folderNoteView";
 import { t } from "./locale/helpers";
 
@@ -39,7 +40,9 @@ export class ExplorerAdd {
 		const settings = this.plugin.settings;
 		const row = (evt.target as HTMLElement | null)?.closest<HTMLElement>(ROW) ?? null;
 		if (!row || !settings.enabled || !settings.folderNotes || row === this.row) return;
-		const file = this.plugin.app.vault.getAbstractFileByPath(row.dataset.path ?? "");
+		const path = row.dataset.path ?? "";
+		if (isAttachmentsFolder(path)) return;
+		const file = this.plugin.app.vault.getAbstractFileByPath(path);
 		if (!(file instanceof TFolder) && !(file instanceof TFile && file.extension === "md")) return;
 		this.row = row;
 		row.appendChild(this.button);

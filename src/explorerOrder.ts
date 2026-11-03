@@ -6,15 +6,35 @@
  * pages come last. Pure. See test/explorerOrder.test.mjs.
  */
 
+import { isAttachmentsFolder } from "./folderNotes";
+
 export interface TreeChild {
 	path: string;
 	name: string;
-	/** A markdown note or a folder. The folder's own note is not one. */
+	/** A markdown note or a folder (other than `_attachments`). The folder's own note is not one. */
 	page: boolean;
 }
 
 /**
- * The direct child of `folder` that a link to `target` names.
+ * The direct child of `folder` that a link or embed to `target` names.
+ *
+ * A file in the folder is itself. Anything deeper is the subfolder it sits
+ * in, since the explorer shows that subfolder as the one row. The folder's
+ * own note, an `_attachments` folder, and anything outside the folder are not
+ * children.
+ */
+export function childOfFolder(folder: string, target: string, ownNote: string): string | null {
+	if (folder === "" || target === ownNote || !target.startsWith(`${folder}/`)) return null;
+	const rest = target.slice(folder.length + 1);
+	if (rest === "") return null;
+	const slash = rest.indexOf("/");
+	const child = slash === -1 ? target : `${folder}/${rest.slice(0, slash)}`;
+	return isAttachmentsFolder(child) ? null : child;
+}
+
+/**
+ * The direct child of `folder` that a link to `target` names, when it is a
+ * sub-page (a markdown note or a subfolder).
  *
  * A note in the folder is itself. Anything deeper is the subfolder it sits
  * in, since the explorer shows that subfolder as the one row. The folder's
@@ -22,11 +42,29 @@ export interface TreeChild {
  * sub-page.
  */
 export function childForTarget(folder: string, target: string, ownNote: string): string | null {
-	if (folder === "" || target === ownNote || !target.startsWith(`${folder}/`)) return null;
+	const child = childOfFolder(folder, target, ownNote);
+	if (child === null) return null;
 	const rest = target.slice(folder.length + 1);
-	const slash = rest.indexOf("/");
-	if (slash === -1) return rest.endsWith(".md") ? target : null;
-	return `${folder}/${rest.slice(0, slash)}`;
+	if (!rest.includes("/") && !rest.endsWith(".md")) return null;
+	return child;
+}
+
+/**
+ * Direct children of a folder note's folder that the note never links or
+ * embeds, ordered pages first by name, then files by name. `_attachments` is
+ * never listed.
+ */
+export function unlinkedChildren<T extends TreeChild>(
+	children: readonly T[],
+	linked: ReadonlySet<string>,
+	ownNote: string,
+): T[] {
+	const rest = children.filter(
+		(child) => child.path !== ownNote && !isAttachmentsFolder(child.path) && !linked.has(child.path),
+	);
+	const pages = rest.filter((child) => child.page).sort(byName);
+	const files = rest.filter((child) => !child.page).sort(byName);
+	return [...pages, ...files];
 }
 
 /**

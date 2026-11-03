@@ -13,6 +13,8 @@ import {
 	normalizeNoteText,
 	noteNameFromFile,
 	offsetLine,
+	folderNameFromEntry,
+	planDirectoryDrop,
 	planNoteDrop,
 	vaultRelativePath,
 } from "./.build/noteDrop.js";
@@ -138,4 +140,177 @@ test("offsetLine counts newlines", () => {
 	assert.equal(offsetLine("a\nbc\n", 0), 1);
 	assert.equal(offsetLine("a\nbc\n", 2), 2);
 	assert.equal(offsetLine("a\nbc\n", 5), 3);
+});
+
+const taken = (paths) => {
+	const set = new Set(paths);
+	return (path) => set.has(path);
+};
+
+const dropDir = (over) => planDirectoryDrop({
+	parent: "Travel",
+	dirName: "Paris",
+	entries: [],
+	fallbackName: "Untitled",
+	exists: taken([]),
+	sourceNotePath: "Travel/Travel.md",
+	vaultDir: null,
+	...over,
+});
+
+test("a dropped folder's name is safe to link", () => {
+	assert.equal(folderNameFromEntry("My Folder"), "My Folder");
+	assert.equal(folderNameFromEntry("weird#name"), "weird-name");
+	assert.equal(folderNameFromEntry(".hidden"), "hidden");
+	assert.equal(folderNameFromEntry("..."), "");
+});
+
+test("a dropped folder is copied under the page and becomes its folder note", () => {
+	assert.deepEqual(dropDir({
+		entries: [
+			{ relative: "hotel.md", kind: "file" },
+			{ relative: "img", kind: "dir" },
+			{ relative: "img/pic.png", kind: "file" },
+			{ relative: ".DS_Store", kind: "file" },
+			{ relative: "img/.DS_Store", kind: "file" },
+		],
+	}), {
+		folder: "Travel/Paris",
+		moveFrom: null,
+		noteSource: null,
+		notePath: "Travel/Paris/Paris.md",
+		directories: ["Travel/Paris", "Travel/Paris/img"],
+		copies: [
+			{ relative: "hotel.md", dest: "Travel/Paris/hotel.md" },
+			{ relative: "img/pic.png", dest: "Travel/Paris/img/pic.png" },
+		],
+	});
+});
+
+test("an empty dropped folder is still a folder note", () => {
+	assert.deepEqual(dropDir({ entries: [] }), {
+		folder: "Travel/Paris",
+		moveFrom: null,
+		noteSource: null,
+		notePath: "Travel/Paris/Paris.md",
+		directories: ["Travel/Paris"],
+		copies: [],
+	});
+});
+
+test("a top-level note named after the folder is the folder note", () => {
+	const plan = dropDir({
+		entries: [
+			{ relative: "paris.md", kind: "file" },
+			{ relative: "hotel.md", kind: "file" },
+			{ relative: "sub/Paris.md", kind: "file" },
+		],
+	});
+	assert.equal(plan.noteSource, "paris.md");
+	assert.equal(plan.notePath, "Travel/Paris/Paris.md");
+	assert.deepEqual(plan.copies, [
+		{ relative: "hotel.md", dest: "Travel/Paris/hotel.md" },
+		{ relative: "sub/Paris.md", dest: "Travel/Paris/sub/Paris.md" },
+	]);
+});
+
+test("a folder the vault already has is moved, not copied", () => {
+	const plan = dropDir({
+		vaultDir: "Inbox/Paris",
+		exists: taken(["Inbox/Paris"]),
+		entries: [{ relative: "Paris.md", kind: "file" }, { relative: "hotel.md", kind: "file" }],
+	});
+	assert.deepEqual(plan, {
+		folder: "Travel/Paris",
+		moveFrom: "Inbox/Paris",
+		noteSource: "Paris.md",
+		notePath: "Travel/Paris/Paris.md",
+		directories: [],
+		copies: [],
+	});
+});
+
+test("a folder already in this page stays where it is", () => {
+	const plan = dropDir({
+		vaultDir: "Travel/Paris",
+		exists: taken(["Travel/Paris"]),
+		entries: [{ relative: "hotel.md", kind: "file" }],
+	});
+	assert.equal(plan.moveFrom, "Travel/Paris");
+	assert.equal(plan.folder, "Travel/Paris");
+	assert.deepEqual(plan.copies, []);
+});
+
+test("a taken folder name gains a suffix and the folder note follows it", () => {
+	const plan = dropDir({
+		exists: taken(["Travel/Paris"]),
+		entries: [
+			{ relative: "Paris.md", kind: "file" },
+			{ relative: "hotel.md", kind: "file" },
+		],
+	});
+	assert.equal(plan.folder, "Travel/Paris 1");
+	assert.equal(plan.notePath, "Travel/Paris 1/Paris 1.md");
+	assert.equal(plan.noteSource, "Paris.md");
+	assert.deepEqual(plan.copies, [
+		{ relative: "hotel.md", dest: "Travel/Paris 1/hotel.md" },
+	]);
+});
+
+test("a suffix skips a name another file in the tree already uses", () => {
+	const plan = dropDir({
+		exists: taken(["Travel/Paris"]),
+		entries: [
+			{ relative: "Paris.md", kind: "file" },
+			{ relative: "Paris 1.md", kind: "file" },
+		],
+	});
+	assert.equal(plan.folder, "Travel/Paris 2");
+	assert.equal(plan.notePath, "Travel/Paris 2/Paris 2.md");
+	assert.equal(plan.noteSource, "Paris.md");
+});
+
+test("dropping the page's own folder is refused", () => {
+	assert.deepEqual(dropDir({ vaultDir: "Travel" }), { skip: "self" });
+	assert.deepEqual(dropDir({
+		sourceNotePath: "Notes/Trip.md",
+		vaultDir: "Notes/Trip",
+	}), { skip: "self" });
+	assert.deepEqual(dropDir({
+		sourceNotePath: "Travel/Paris/Paris.md",
+		vaultDir: "Travel",
+	}), { skip: "self" });
+});
+
+test("a dropped folder keeps a usable name and a safe inner path", () => {
+	const plan = dropDir({
+		dirName: "...",
+		entries: [{ relative: "a#b/c.md", kind: "file" }, { relative: "../x.md", kind: "file" }],
+	});
+	assert.equal(plan.folder, "Travel/Untitled");
+	assert.equal(plan.notePath, "Travel/Untitled/Untitled.md");
+	assert.deepEqual(plan.copies, [
+		{ relative: "a#b/c.md", dest: "Travel/Untitled/a-b/c.md" },
+	]);
+	assert.deepEqual(plan.directories, ["Travel/Untitled", "Travel/Untitled/a-b"]);
+});
+
+test("two files that sanitize to one name do not share a path", () => {
+	const plan = dropDir({
+		entries: [
+			{ relative: "a#b.md", kind: "file" },
+			{ relative: "a-b.md", kind: "file" },
+		],
+	});
+	assert.deepEqual(plan.copies.map((copy) => copy.dest), [
+		"Travel/Paris/a-b.md",
+		"Travel/Paris/a-b 1.md",
+	]);
+});
+
+test("a dropped folder at the vault root is still a folder note", () => {
+	const plan = dropDir({ parent: "", entries: [] });
+	assert.equal(plan.folder, "Paris");
+	assert.equal(plan.notePath, "Paris/Paris.md");
+	assert.deepEqual(plan.directories, ["Paris"]);
 });
