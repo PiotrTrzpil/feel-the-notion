@@ -22,6 +22,6 @@ dev:
 # Everything before a commit
 verify: check test
 
-# Build and install into the Obsidian vault (OBSIDIAN_VAULT in repo .env)
+# Build and install into the Obsidian vault (OBSIDIAN_VAULT in the Scripts repo .env)
 install:
-    nu ../new-mac-setup/user/obsidian_feel_the_notion.nu
+    nu ~/Code/Scripts/new-mac-setup/user/obsidian_feel_the_notion.nu --repo .

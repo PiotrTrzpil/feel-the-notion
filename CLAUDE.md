@@ -5,11 +5,11 @@ Obsidian plugin (TypeScript) providing Notion-style block editing, folder notes 
 ## CRITICAL: Obsidian Vault Access & Installation
 
 - **NEVER access the user's Obsidian vault.** Do not read, list, search, or modify any files in the vault or read `OBSIDIAN_VAULT` from `.env`.
-- **NEVER install or update the plugin in the vault yourself.** Do not run `just install` or `new-mac-setup/user/obsidian_feel_the_notion.nu`. Installing or updating the plugin in the vault must ONLY be done by the user running `just install` themselves.
+- **NEVER install or update the plugin in the vault yourself.** Do not run `just install` or `~/Code/Scripts/new-mac-setup/user/obsidian_feel_the_notion.nu`. Installing or updating the plugin in the vault must ONLY be done by the user running `just install` themselves.
 
 ## Commands
 
-Run from `feel-the-notion/` (uses `npm`, not `pnpm`, so `overrides` keeps a single `@codemirror/state` instance):
+Run from the repo root (uses `npm`, not `pnpm`, so `overrides` keeps a single `@codemirror/state` instance):
 
 - `just verify` — runs typecheck/lint, production build, and unit tests
 - `just lint` / `just check` — runs `tsc --noEmit --skipLibCheck` (with strict unused/return checks) and bundle check
