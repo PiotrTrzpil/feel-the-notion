@@ -605,7 +605,7 @@ export class BlockPluginSettingTab extends PluginSettingTab {
         this.plugin.settings.insertOrder = next.insertOrder;
         this.plugin.settings.insertHidden = next.insertHidden;
         this.plugin.settings.insertCustom = next.insertCustom;
-        return this.plugin.saveSettings();
+        await this.plugin.saveSettings();
         this.refreshInsertList();
     }
 

@@ -43,6 +43,11 @@ test("a hash inside a code fence is not a heading", () => {
 	assert.deepEqual(headings.map((h) => h.text), ["Real", "Also real"]);
 });
 
+test("a trailing hash is part of the title unless whitespace separates it", () => {
+	const headings = collectHeadings(docOf(["# C#", "## Issue #", "### Closed ###"]));
+	assert.deepEqual(headings.map((h) => h.text), ["C#", "Issue", "Closed"]);
+});
+
 test("tilde fences count too, and a mismatched one does not close", () => {
 	const headings = collectHeadings(docOf(["~~~", "# inside", "```", "# still inside", "~~~", "# out"]));
 	assert.deepEqual(headings.map((h) => h.text), ["out"]);

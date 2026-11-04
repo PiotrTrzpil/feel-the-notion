@@ -1,7 +1,7 @@
 import { RangeSetBuilder, StateEffect } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { MarkdownView, TFile, WorkspaceLeaf, debounce, editorInfoField } from "obsidian";
+import { MarkdownView, TFile, WorkspaceLeaf, debounce, editorInfoField, getLinkpath } from "obsidian";
 import type NotionBlock from "./main";
 import { findLinks } from "./fileDrop";
 import { isNestedPage } from "./pageLink";
@@ -143,7 +143,7 @@ export class LinkIcons {
 		if (!settings.enabled || !settings.pageHeader) return;
 		el.querySelectorAll<HTMLAnchorElement>("a.internal-link").forEach((a) => {
 			if (a.querySelector(".ftn-link-icon")) return;
-			const target = app.metadataCache.getFirstLinkpathDest(a.dataset.href ?? a.getAttr("href") ?? "", sourcePath);
+			const target = app.metadataCache.getFirstLinkpathDest(getLinkpath(a.dataset.href ?? a.getAttr("href") ?? ""), sourcePath);
 			if (!target || target.extension !== "md") return;
 			// A sub-page link is drawn as its own block, icon included.
 			if (settings.folderNotes && settings.pageLinkBlocks && isNestedPage(sourcePath, target.path)) return;

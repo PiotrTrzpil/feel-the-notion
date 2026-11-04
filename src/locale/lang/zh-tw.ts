@@ -156,7 +156,8 @@ const zhTw: LocaleType = {
     "settings.customCommand.cancel": "取消",
     "settings.customCommand.boundTo": "來自 Obsidian「{name}」",
     "settings.customCommand.edit": "編輯",
-    "settings.customCommand.delete": "刪除"
+    "settings.customCommand.delete": "刪除",
+    "settings.customCommand.incomplete": "請選擇一個命令並填寫名稱。"
 };
 
 export default zhTw;

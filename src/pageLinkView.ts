@@ -1,7 +1,7 @@
 import { EditorState, Prec, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
-import { Keymap, MarkdownView, TFile, debounce, editorInfoField } from "obsidian";
+import { Keymap, MarkdownView, TFile, debounce, editorInfoField, getLinkpath } from "obsidian";
 import type NotionBlock from "./main";
 import { findFencedLines } from "./codeFence";
 import { embedAsAttachmentRow, isAttachmentPath } from "./attachmentLink";
@@ -321,7 +321,7 @@ export class PageLinks {
 		const { app } = this.plugin;
 		el.querySelectorAll<HTMLAnchorElement>("a.internal-link").forEach((anchor) => {
 			if (anchor.classList.contains("ftn-page-link")) return;
-			const target = app.metadataCache.getFirstLinkpathDest(anchor.dataset.href ?? anchor.getAttr("href") ?? "", sourcePath);
+			const target = app.metadataCache.getFirstLinkpathDest(getLinkpath(anchor.dataset.href ?? anchor.getAttr("href") ?? ""), sourcePath);
 			if (!(target instanceof TFile)) return;
 			const page = pages && isNestedPage(sourcePath, target.path);
 			const attachment = !page && attachments && isAttachmentPath(target.path);

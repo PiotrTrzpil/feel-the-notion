@@ -1,4 +1,4 @@
-import { App, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
+import { App, TAbstractFile, TFile, TFolder, WorkspaceLeaf, getLinkpath } from "obsidian";
 import type NotionBlock from "./main";
 import { TreeChild, childForTarget, childOfFolder, orderSubpages } from "./explorerOrder";
 import { folderOfNote, isAttachmentsFolder } from "./folderNotes";
@@ -114,7 +114,7 @@ export function mentionedChildPaths(app: App, folderPath: string, note: TFile): 
 	const out: string[] = [];
 	const seen = new Set<string>();
 	for (const link of sorted) {
-		const dest = app.metadataCache.getFirstLinkpathDest(link.link, note.path);
+		const dest = app.metadataCache.getFirstLinkpathDest(getLinkpath(link.link), note.path);
 		if (!dest) continue;
 		const child = childForTarget(folderPath, dest.path, note.path);
 		if (!child || seen.has(child)) continue;
@@ -134,7 +134,7 @@ export function linkedChildPaths(app: App, folderPath: string, note: TFile): Set
 	];
 	const seen = new Set<string>();
 	for (const ref of refs) {
-		const dest = app.metadataCache.getFirstLinkpathDest(ref.link, note.path);
+		const dest = app.metadataCache.getFirstLinkpathDest(getLinkpath(ref.link), note.path);
 		if (!dest) continue;
 		const child = childOfFolder(folderPath, dest.path, note.path);
 		if (child) seen.add(child);

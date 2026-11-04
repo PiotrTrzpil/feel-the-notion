@@ -711,7 +711,8 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
 
 .ftn-page-header:hover .ftn-page-header-actions,
 .ftn-page-header:has(+ .inline-title:hover) .ftn-page-header-actions,
-.ftn-page-header:has(+ .inline-title:focus) .ftn-page-header-actions {
+.ftn-page-header:has(+ .inline-title:focus) .ftn-page-header-actions,
+.ftn-page-header-actions:focus-within {
     opacity: 1;
 }
 
@@ -727,6 +728,10 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     cursor: pointer;
+}
+
+.ftn-header-button:focus-visible {
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
 .ftn-header-button:hover {

@@ -744,6 +744,8 @@ export const blockHandlesExtension = (plugin: NotionBlock) => ViewPlugin.fromCla
             }
             this.hoveredLine = null;
             this.hoveredBand = null;
+            // Or the line number hidden under the handle stays hidden.
+            this.syncGutterLine(null);
             this.handleEl?.classList.add("is-hidden");
         }, plugin.settings.hideDelay);
     }

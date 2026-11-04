@@ -34,6 +34,11 @@ test("colouring a whitespace-only line behaves the same", () => {
 
 // ── lines with content ─────────────────────────────────────────────────────
 
+test("a nested list item keeps its indent and bullet outside the span", () => {
+	const plan = planColorWrap("    - child", "span", BLUE);
+	assert.equal(plan.text, `    - ${OPEN}child</span>`);
+});
+
 test("existing text is wrapped and the caret follows it", () => {
 	const plan = planColorWrap("hello", "span", BLUE);
 	assert.equal(plan.text, `${OPEN}hello</span>`);

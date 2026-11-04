@@ -12,7 +12,8 @@ const localeMap: Record<string, Record<string, string>> = {
 
 const getLocale = (): Record<string, string> => {
     // Obsidian stores UI language in localStorage
-    const lang = window.localStorage?.getItem("language") || "en";
+    // Lowercased: Obsidian stores e.g. "zh-TW", the map keys are lowercase.
+    const lang = (window.localStorage?.getItem("language") ?? "en").toLowerCase();
     return localeMap[lang] || localeMap[lang.split("-")[0]] || en;
 };
 

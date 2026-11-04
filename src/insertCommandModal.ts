@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, Command, Modal, Setting, setIcon } from "obsidian";
+import { AbstractInputSuggest, App, Command, Modal, Notice, Setting, setIcon } from "obsidian";
 import { COMMAND_PICKER_LIMIT, CustomInsertItem, matchCommands } from "./insertRegistry";
 import { t } from "./locale/helpers";
 
@@ -145,7 +145,10 @@ export class InsertCommandModal extends Modal {
 				.onClick(() => {
 					// Both are required: a row with no command does nothing, and
 					// a row with no label is a blank line in the menu.
-					if (!this.label.trim() || !this.commandId) return;
+					if (!this.label.trim() || !this.commandId) {
+						new Notice(t("settings.customCommand.incomplete"));
+						return;
+					}
 					this.onSave({
 						id: this.id,
 						label: this.label.trim(),

@@ -154,7 +154,8 @@ const en = {
     "settings.customCommand.cancel": "Cancel",
     "settings.customCommand.boundTo": "Runs Obsidian “{name}”",
     "settings.customCommand.edit": "Edit",
-    "settings.customCommand.delete": "Delete"
+    "settings.customCommand.delete": "Delete",
+    "settings.customCommand.incomplete": "Pick a command and give it a name."
 };
 
 export default en;

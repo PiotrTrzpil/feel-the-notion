@@ -1,4 +1,4 @@
-import { App, Notice, TFile, normalizePath } from "obsidian";
+import { App, Notice, TFile, TFolder, normalizePath } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import { Text } from "@codemirror/state";
 import { dispatchBlockEdit } from "./history";
@@ -103,7 +103,7 @@ async function planAttachmentMoves(
 	for (const file of inBlock) {
 		if (stillUsed.has(file) || linkedFromOtherNotes(app, file, sourceFile)) continue;
 		const to = normalizePath(await app.fileManager.getAvailablePathForAttachment(file.name, target.path));
-		if (parentPath(to) === (file.parent?.path ?? "")) continue;
+		if (parentPath(to) === folderPath(file.parent)) continue;
 		moves.push({ file, to });
 	}
 	return moves;
@@ -117,6 +117,11 @@ function linkedFromOtherNotes(app: App, file: TFile, sourceFile: TFile): boolean
 	return Object.entries(app.metadataCache.resolvedLinks).some(
 		([note, targets]) => note !== sourceFile.path && (targets[file.path] ?? 0) > 0
 	);
+}
+
+/** The vault root's path is "/", but `parentPath` gives "" for a root file. */
+function folderPath(folder: TFolder | null): string {
+	return !folder || folder.path === "/" ? "" : folder.path;
 }
 
 function parentPath(path: string): string {

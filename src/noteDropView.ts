@@ -131,8 +131,8 @@ async function placeExplorerDrop(plugin: NotionBlock, target: TFile | TFolder, d
 		const dest = target instanceof TFolder
 			? target.path === "/" ? "" : target.path
 			: target.extension === "md"
-				? await subPageFolder(plugin, target) ?? target.parent?.path ?? ""
-				: target.parent?.path ?? "";
+				? await subPageFolder(plugin, target) ?? rootAsEmpty(target.parent?.path)
+				: rootAsEmpty(target.parent?.path);
 		const sourceBefore = target instanceof TFile ? target.path : folderNotePath(dest) ?? "";
 		let failed = 0;
 		let skippedSelf = 0;
@@ -263,7 +263,7 @@ async function placeDropped(
 		// the link has to be written from where the note ends up.
 		const folder = await subPageFolder(plugin, note);
 		const sourcePath = note.path;
-		const dest = folder ?? note.parent?.path ?? "";
+		const dest = folder ?? rootAsEmpty(note.parent?.path);
 
 		const links: string[] = [];
 		let failed = 0;
@@ -817,4 +817,9 @@ async function readDroppedBytes(absolute: string): Promise<ArrayBuffer> {
 	const copy = new ArrayBuffer(bytes.byteLength);
 	new Uint8Array(copy).set(bytes);
 	return copy;
+}
+
+/** The vault root is "/" as a folder path but "" as a `parentPath`. */
+function rootAsEmpty(path: string | undefined): string {
+	return !path || path === "/" ? "" : path;
 }

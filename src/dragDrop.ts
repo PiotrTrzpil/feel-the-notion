@@ -237,6 +237,8 @@ export class DragManager {
         event.preventDefault();
         event.stopPropagation();
         this.currentTargetLine = null;
+        // Or stopDrag takes the note-target branch and moves the block anyway.
+        this.setNoteTarget(null);
         this.stopDrag();
     };
 

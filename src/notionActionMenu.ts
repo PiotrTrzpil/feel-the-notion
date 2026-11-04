@@ -49,7 +49,7 @@ interface MenuPosition {
 const TEXT_COLORS: ColorOption[] = [
     { id: "default", label: "默认文本", value: "", className: "is-default" },
     { id: "gray", label: "灰色文本", value: "var(--text-muted)", className: "is-gray" },
-    { id: "brown", label: "棕色文本", value: "var(--color-orange)", className: "is-brown" },
+    { id: "brown", label: "棕色文本", value: "#9f6b53", className: "is-brown" },
     { id: "orange", label: "橙色文本", value: "var(--color-orange)", className: "is-orange" },
     { id: "yellow", label: "黄色文本", value: "var(--color-yellow)", className: "is-yellow" },
     { id: "green", label: "绿色文本", value: "var(--color-green)", className: "is-green" },
@@ -62,7 +62,7 @@ const TEXT_COLORS: ColorOption[] = [
 const BACKGROUND_COLORS: ColorOption[] = [
     { id: "default", label: "默认背景", value: "", className: "is-default" },
     { id: "gray", label: "灰色背景", value: "rgba(var(--mono-rgb-100), 0.08)", className: "is-gray" },
-    { id: "brown", label: "棕色背景", value: "rgba(var(--color-orange-rgb), 0.16)", className: "is-brown" },
+    { id: "brown", label: "棕色背景", value: "rgba(159, 107, 83, 0.16)", className: "is-brown" },
     { id: "orange", label: "橙色背景", value: "rgba(var(--color-orange-rgb), 0.16)", className: "is-orange" },
     { id: "yellow", label: "黄色背景", value: "rgba(var(--color-yellow-rgb), 0.18)", className: "is-yellow" },
     { id: "green", label: "绿色背景", value: "rgba(var(--color-green-rgb), 0.16)", className: "is-green" },

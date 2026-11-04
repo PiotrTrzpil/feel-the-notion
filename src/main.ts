@@ -83,6 +83,7 @@ export default class NotionBlock extends Plugin {
             checkCallback: (dryRun: boolean) => {
                 const note = this.app.workspace.getActiveFile();
                 if (!note || note.extension !== 'md' || !this.settings.enabled) return false;
+                if (this.settings.templatesFolder.trim() === '') return false;
                 if (!dryRun) pickTemplate(this, note);
                 return true;
             },

@@ -32,7 +32,9 @@ export function splitMarkdownLine(text: string): LineParts {
 	const blockIdMatch = text.match(/(\s\^[A-Za-z0-9-]+)$/);
 	const suffix = blockIdMatch?.[1] ?? "";
 	const body = suffix ? text.slice(0, -suffix.length) : text;
-	const prefixMatch = body.match(/^(#{1,6}\s+|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+\.\s+|>\s+)/);
+	// The indent belongs to the prefix, or a nested list item loses its nesting.
+	// Only when text follows it: a whitespace-only line has no prefix.
+	const prefixMatch = body.match(/^([ \t]*(?:#{1,6}\s+|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+\.\s+|>\s+)|[ \t]*(?=\S))/);
 	const prefix = prefixMatch?.[1] ?? "";
 	return {
 		prefix,

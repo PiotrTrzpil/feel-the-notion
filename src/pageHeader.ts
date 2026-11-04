@@ -186,9 +186,12 @@ export class PageHeaders {
 		});
 		img.addEventListener("pointerup", () => {
 			if (!drag) return;
-			const pct = drag.pct;
+			const { pct, startPct } = drag;
 			drag = null;
+			// Leave the mode even on a click with no drag, or the label stays stuck.
 			coverEl.removeClass("is-repositioning");
+			reposition.setText("Reposition");
+			if (pct === startPct) return;
 			void this.writeFrontmatter(file, (frontmatter) => {
 				frontmatter[COVER_Y_KEY] = pct;
 			});

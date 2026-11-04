@@ -17,8 +17,8 @@ export interface Heading {
 	line: number;
 }
 
-/** ATX heading: up to three leading spaces, then 1-6 hashes and a space. */
-const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
+/** ATX heading: up to three leading spaces, then 1-6 hashes and a space; a closing run of hashes counts only after whitespace (`# C#` keeps its hash). */
+const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
 const FENCE = /^[ \t]*(```|~~~)/;
 
 /**

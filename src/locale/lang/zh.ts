@@ -156,7 +156,8 @@ const zh: LocaleType = {
     "settings.customCommand.cancel": "取消",
     "settings.customCommand.boundTo": "来自 Obsidian “{name}”",
     "settings.customCommand.edit": "编辑",
-    "settings.customCommand.delete": "删除"
+    "settings.customCommand.delete": "删除",
+    "settings.customCommand.incomplete": "请选择一个命令并填写名称。"
 };
 
 export default zh;
