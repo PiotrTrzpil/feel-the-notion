@@ -3,7 +3,7 @@ import { Editor, FileSystemAdapter, MarkdownFileInfo, MarkdownView, Notice, TFil
 import type NotionBlock from "./main";
 import { toMarkdownLink } from "./attachmentLink";
 import { availableNotePath, isImageFile, saveAttachment } from "./blockTransform";
-import { joinPath, parentPath } from "./folderNotes";
+import { folderNotePath, joinPath, parentPath } from "./folderNotes";
 import { subPageFolder } from "./folderNoteView";
 import { dispatchBlockEdit } from "./history";
 import { t } from "./locale/helpers";
@@ -86,8 +86,112 @@ function onCaptureDrop(plugin: NotionBlock, evt: DragEvent): void {
 	if (!plugin.settings.enabled || !plugin.settings.folderNotes) return;
 	if (isInternalDrag(plugin)) return;
 	const target = markdownDropTarget(plugin, evt);
-	if (!target) return;
-	acceptDrop(plugin, evt, target.editor, target.note);
+	if (target) {
+		acceptDrop(plugin, evt, target.editor, target.note);
+		return;
+	}
+	const explorerTarget = explorerDropTarget(plugin, evt);
+	if (explorerTarget !== null) acceptExplorerDrop(plugin, evt, explorerTarget);
+}
+
+/**
+ * The file-explorer item a drop landed on: a folder, a note, or the empty
+ * space below the tree (the vault root). Null when the drop missed the explorer.
+ */
+function explorerDropTarget(plugin: NotionBlock, evt: DragEvent): TFile | TFolder | null {
+	const el = eventElement(evt.target);
+	const container = el?.closest(".nav-files-container");
+	if (!el || !container) return null;
+	const item = el.closest<HTMLElement>(".nav-folder-title, .nav-file-title");
+	const path = item?.dataset.path;
+	if (path === undefined) return plugin.app.vault.getRoot();
+	const found = plugin.app.vault.getAbstractFileByPath(path);
+	return found instanceof TFile || found instanceof TFolder ? found : null;
+}
+
+/**
+ * Desktop folders dropped onto the file explorer, which Obsidian does not
+ * import itself. Each is copied in as a folder note but not linked anywhere,
+ * so it shows among the target page's unlinked children. Drops without a
+ * folder are left to Obsidian, which imports files there already; files that
+ * come with a folder are copied into the same place.
+ */
+function acceptExplorerDrop(plugin: NotionBlock, evt: DragEvent, target: TFile | TFolder): void {
+	const dropped = droppedFiles(evt);
+	if (!dropped.some((item) => item.isDirectory)) return;
+	claimedDrops.add(evt);
+	evt.preventDefault();
+	evt.stopPropagation();
+	void placeExplorerDrop(plugin, target, dropped);
+}
+
+async function placeExplorerDrop(plugin: NotionBlock, target: TFile | TFolder, dropped: DroppedFile[]): Promise<void> {
+	try {
+		// A plain note becomes a folder note, the same as a drop into its page.
+		const dest = target instanceof TFolder
+			? target.path === "/" ? "" : target.path
+			: target.extension === "md"
+				? await subPageFolder(plugin, target) ?? target.parent?.path ?? ""
+				: target.parent?.path ?? "";
+		const sourceBefore = target instanceof TFile ? target.path : folderNotePath(dest) ?? "";
+		let failed = 0;
+		let skippedSelf = 0;
+		for (const item of dropped) {
+			try {
+				if (!item.isDirectory) {
+					await placeExplorerFile(plugin, dest, item);
+					continue;
+				}
+				const vaultDir = vaultFolderPath(plugin, item.fsPath);
+				if (vaultDir !== null && (vaultDir === dest || isDirectorySelfDrop(sourceBefore, vaultDir))) {
+					skippedSelf++;
+					continue;
+				}
+				const link = await placeDirectory(plugin, dest, sourceBefore, sourceBefore, item, vaultDir);
+				if (link === null) skippedSelf++;
+			} catch (error) {
+				failed++;
+				console.error(`feel-the-notion: dropping ${item.name} failed`, error);
+			}
+		}
+		if (failed > 0) new Notice(t("notice.dropNoteFailed"));
+		else if (skippedSelf > 0) new Notice(t("notice.dropOntoSelf"));
+	} catch (error) {
+		console.error("feel-the-notion: dropping a folder on the explorer failed", error);
+		new Notice(t("notice.dropNoteFailed"));
+	}
+}
+
+/**
+ * A file dropped on the explorer beside a folder, saved into `dest`. A note
+ * already in the vault is moved there, the way a drop into a page moves it.
+ */
+async function placeExplorerFile(plugin: NotionBlock, dest: string, item: DroppedFile): Promise<void> {
+	const { vault, fileManager } = plugin.app;
+	if (isMarkdownDrop(item.name, item.fsPath, item.mime)) {
+		const name = noteNameFromFile(item.fsPath ?? item.name) || noteNameFromFile(item.name) || t("page.untitled");
+		const existing = vaultMarkdown(plugin, item.fsPath);
+		if (existing) {
+			if (parentPath(existing.path) !== dest) await fileManager.renameFile(existing, availableNotePath(plugin, dest, name));
+			return;
+		}
+		await vault.create(availableNotePath(plugin, dest, name), normalizeNoteText(await droppedText(item)));
+		return;
+	}
+	const file = await droppedAsFile(item);
+	await vault.createBinary(availableFilePath(plugin, dest, file.name), await file.arrayBuffer());
+}
+
+/** `name` in `folder`, or `stem 1.ext`, `stem 2.ext`, ... when it is taken. */
+function availableFilePath(plugin: NotionBlock, folder: string, name: string): string {
+	const dot = name.lastIndexOf(".");
+	const stem = dot > 0 ? name.slice(0, dot) : name;
+	const ext = dot > 0 ? name.slice(dot) : "";
+	for (let n = 0; n < 1000; n++) {
+		const path = joinPath(folder, n === 0 ? name : `${stem} ${n}${ext}`);
+		if (!plugin.app.vault.getAbstractFileByPath(path)) return path;
+	}
+	throw new Error("no available file name");
 }
 
 /** Same claim, for a drop whose files were not visible yet during capture. */
