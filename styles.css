@@ -780,6 +780,12 @@ body.ftn-bullet-depth .markdown-rendered ul > li.task-list-item { list-style-typ
     visibility: hidden;
 }
 
+/* No line numbers on mobile, even with the setting on: on a phone-width
+ * editor the gutter only eats text width. */
+.is-mobile .markdown-source-view .cm-gutter.cm-lineNumbers {
+    display: none;
+}
+
 /* ---- Pages: icons beside links and on tabs ------------------------------ */
 
 .ftn-link-icon,
